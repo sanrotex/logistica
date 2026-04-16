@@ -351,7 +351,7 @@ let sb, currentUser = null, users = [], todayData = [], istoricData = [], editin
 // ═══ INIT ═══
 async function init() {
   sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  const { data } = await sb.from('utilizatori').select('id, nume, rol').eq('activ', true).order('nume');
+  const { data } = await sb.from('utilizatori_logistica').select('id, nume, rol').eq('activ', true).order('nume');
   users = data || [];
   const sel = document.getElementById('login-user');
   users.forEach(u => { const o = document.createElement('option'); o.value = u.id; o.textContent = u.nume; sel.appendChild(o); });
@@ -791,7 +791,7 @@ function renderUsersList() {
 async function addUser() {
   const name = document.getElementById('new-user-name').value.trim();
   if (!name) return;
-  const { data, error } = await sb.from('utilizatori').insert({ nume: name, rol: 'Operator', activ: true }).select();
+  const { data, error } = await sb.from('utilizatori_logistica').insert({ nume: name, rol: 'Operator', activ: true }).select();
   if (error) { alert('Eroare: ' + error.message); return; }
   document.getElementById('new-user-name').value = '';
   await reloadUsers();
@@ -801,7 +801,7 @@ async function addUser() {
 async function renameUser(id, oldName) {
   const newName = prompt('Nume nou pentru ' + oldName + ':', oldName);
   if (!newName || newName.trim() === oldName) return;
-  const { error } = await sb.from('utilizatori').update({ nume: newName.trim() }).eq('id', id);
+  const { error } = await sb.from('utilizatori_logistica').update({ nume: newName.trim() }).eq('id', id);
   if (error) { alert('Eroare: ' + error.message); return; }
   await reloadUsers();
   renderUsersList();
@@ -815,14 +815,14 @@ async function renameUser(id, oldName) {
 async function removeUser(id, name) {
   if (id === currentUser.id) { alert('Nu te poți dezactiva pe tine.'); return; }
   if (!confirm('Dezactivezi utilizatorul ' + name + '?\n\nNu va mai apărea la login, dar datele rămân.')) return;
-  const { error } = await sb.from('utilizatori').update({ activ: false }).eq('id', id);
+  const { error } = await sb.from('utilizatori_logistica').update({ activ: false }).eq('id', id);
   if (error) { alert('Eroare: ' + error.message); return; }
   await reloadUsers();
   renderUsersList();
 }
 
 async function reloadUsers() {
-  const { data } = await sb.from('utilizatori').select('id, nume, rol').eq('activ', true).order('nume');
+  const { data } = await sb.from('utilizatori_logistica').select('id, nume, rol').eq('activ', true).order('nume');
   users = data || [];
 }
 
