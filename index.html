@@ -95,14 +95,14 @@ body { background: #f4f6f9; font-family: 'Segoe UI', system-ui, sans-serif; padd
         <a class="nav-link" href="#" data-tab="dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a>
         <a class="nav-link" href="#" data-tab="istoric"><i class="bi bi-calendar3"></i> Istoric</a>
       </div>
-      <a class="text-white ms-3" href="#" onclick="openUsers()" style="text-decoration:none;" id="user-badge-top"></a>
+      <a class="text-white ms-3" href="#" style="text-decoration:none;" id="user-badge-top"></a>
     </div>
   </nav>
 
   <!-- Mobile header -->
   <div class="d-md-none bg-white border-bottom px-3 py-2 d-flex align-items-center justify-content-between">
     <strong style="color: var(--srt-blue);">SANROTEX Logistică</strong>
-    <a class="badge bg-secondary" href="#" onclick="openUsers()" style="text-decoration:none;" id="user-badge-mobile"></a>
+    <a class="badge bg-secondary" href="#" style="text-decoration:none;" id="user-badge-mobile"></a>
   </div>
 
   <!-- ═══ TAB: AZI ═══ -->
@@ -207,7 +207,7 @@ body { background: #f4f6f9; font-family: 'Segoe UI', system-ui, sans-serif; padd
         <input type="search" id="istoric-search" class="form-control form-control-sm" placeholder="Caută client / factură..." oninput="renderIstoric()">
       </div>
       <div class="col-2">
-        <button class="btn btn-outline-secondary btn-sm w-100" onclick="exportIstoric()" title="Export Excel"><i class="bi bi-download"></i></button>
+        <button class="btn btn-outline-secondary btn-sm w-100" id="btn-export-istoric" onclick="exportIstoric()" title="Export Excel"><i class="bi bi-download"></i></button>
       </div>
     </div>
     <div id="istoric-summary" class="mb-3"></div>
@@ -351,11 +351,13 @@ let sb, currentUser = null, users = [], todayData = [], istoricData = [], editin
 // ═══ INIT ═══
 async function init() {
   sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  const { data } = await sb.from('utilizatori').select('id, nume').eq('activ', true).order('nume');
+  const { data } = await sb.from('utilizatori').select('id, nume, rol').eq('activ', true).order('nume');
   users = data || [];
   const sel = document.getElementById('login-user');
   users.forEach(u => { const o = document.createElement('option'); o.value = u.id; o.textContent = u.nume; sel.appendChild(o); });
 }
+
+function isAdmin() { return currentUser && currentUser.rol === 'Admin'; }
 
 function doLogin() {
   const uid = parseInt(document.getElementById('login-user').value);
@@ -365,8 +367,20 @@ function doLogin() {
   document.getElementById('app').style.display = 'block';
   document.getElementById('user-badge-top').textContent = currentUser.nume;
   document.getElementById('user-badge-mobile').textContent = currentUser.nume;
+  applyRoleUI();
   setupTabs();
   loadToday();
+}
+
+function applyRoleUI() {
+  const admin = isAdmin();
+  document.querySelectorAll('[data-tab="upload"]').forEach(el => el.style.display = admin ? '' : 'none');
+  document.querySelectorAll('[data-tab="dashboard"]').forEach(el => el.style.display = admin ? '' : 'none');
+  document.getElementById('user-badge-top').onclick = admin ? openUsers : null;
+  document.getElementById('user-badge-top').style.cursor = admin ? 'pointer' : 'default';
+  document.getElementById('user-badge-mobile').onclick = admin ? openUsers : null;
+  document.getElementById('user-badge-mobile').style.cursor = admin ? 'pointer' : 'default';
+  document.getElementById('btn-export-istoric').style.display = admin ? '' : 'none';
 }
 
 // ═══ TABS ═══
@@ -375,6 +389,7 @@ function setupTabs() {
     el.addEventListener('click', e => {
       e.preventDefault();
       const tab = el.dataset.tab;
+      if ((tab === 'upload' || tab === 'dashboard') && !isAdmin()) return;
       document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
       document.getElementById('tab-' + tab).style.display = 'block';
       document.querySelectorAll('[data-tab]').forEach(a => a.classList.remove('active'));
@@ -751,6 +766,7 @@ function exportToExcel(rows, prefix) {
 
 // ═══ UTILIZATORI ═══
 function openUsers() {
+  if (!isAdmin()) return;
   renderUsersList();
   new bootstrap.Modal(document.getElementById('usersModal')).show();
 }
@@ -804,7 +820,7 @@ async function removeUser(id, name) {
 }
 
 async function reloadUsers() {
-  const { data } = await sb.from('utilizatori').select('id, nume').eq('activ', true).order('nume');
+  const { data } = await sb.from('utilizatori').select('id, nume, rol').eq('activ', true).order('nume');
   users = data || [];
 }
 
