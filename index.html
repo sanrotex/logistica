@@ -171,7 +171,10 @@ body { background: #f4f6f9; font-family: 'Segoe UI', system-ui, sans-serif; padd
 
   <!-- ═══ TAB: DASHBOARD ═══ -->
   <div id="tab-dashboard" class="tab-content container-fluid py-3" style="display:none;">
-    <h5 class="mb-3"><i class="bi bi-speedometer2"></i> Dashboard — <span id="dash-date"></span></h5>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="mb-0"><i class="bi bi-speedometer2"></i> Dashboard — <span id="dash-date"></span></h5>
+      <button class="btn btn-outline-primary btn-sm" onclick="exportRaport()"><i class="bi bi-file-earmark-excel"></i> Export raport</button>
+    </div>
     <div class="row g-3 mb-4" id="dash-stats"></div>
     <div class="row g-3">
       <div class="col-12 col-md-6">
@@ -196,7 +199,18 @@ body { background: #f4f6f9; font-family: 'Segoe UI', system-ui, sans-serif; padd
   <!-- ═══ TAB: ISTORIC ═══ -->
   <div id="tab-istoric" class="tab-content container-fluid py-3" style="display:none;">
     <h5 class="mb-3"><i class="bi bi-calendar3"></i> Istoric expedieri</h5>
-    <input type="date" id="istoric-date" class="form-control mb-3" onchange="loadIstoric(this.value)">
+    <div class="row g-2 mb-3">
+      <div class="col-5">
+        <input type="date" id="istoric-date" class="form-control form-control-sm" onchange="loadIstoric(this.value)">
+      </div>
+      <div class="col-5">
+        <input type="search" id="istoric-search" class="form-control form-control-sm" placeholder="Caută client / factură..." oninput="renderIstoric()">
+      </div>
+      <div class="col-2">
+        <button class="btn btn-outline-secondary btn-sm w-100" onclick="exportIstoric()" title="Export Excel"><i class="bi bi-download"></i></button>
+      </div>
+    </div>
+    <div id="istoric-summary" class="mb-3"></div>
     <div id="istoric-list"></div>
   </div>
 
@@ -279,11 +293,16 @@ body { background: #f4f6f9; font-family: 'Segoe UI', system-ui, sans-serif; padd
             <textarea class="form-control form-control-sm" id="ed-obs" rows="2"></textarea>
           </div>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Anulează</button>
-          <button type="button" class="btn btn-srt btn-sm" onclick="saveCard()">
-            <i class="bi bi-check-lg"></i> Salvează
+        <div class="modal-footer d-flex justify-content-between">
+          <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteCard()">
+            <i class="bi bi-trash"></i> Șterge
           </button>
+          <div>
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Anulează</button>
+            <button type="button" class="btn btn-srt btn-sm" onclick="saveCard()">
+              <i class="bi bi-check-lg"></i> Salvează
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -307,7 +326,7 @@ body { background: #f4f6f9; font-family: 'Segoe UI', system-ui, sans-serif; padd
 const SUPABASE_URL = 'https://peeehzlhdfzdyzekzdiu.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBlZWVoemxoZGZ6ZHl6ZWt6ZGl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyNDEyODgsImV4cCI6MjA5MTgxNzI4OH0.EzbX5FYEC9IWrJA7HVu2gHDDa7qZn59396u2cbKivxk';
 
-let sb, currentUser = null, users = [], todayData = [], editingId = null;
+let sb, currentUser = null, users = [], todayData = [], istoricData = [], editingId = null, editSource = 'azi';
 
 // ═══ INIT ═══
 async function init() {
@@ -422,10 +441,13 @@ function renderCards() {
 }
 
 // ═══ EDIT MODAL ═══
-function openEdit(id) {
-  const row = todayData.find(r => r.id === id);
+function openEdit(id, source) {
+  source = source || 'azi';
+  const pool = source === 'istoric' ? istoricData : todayData;
+  const row = pool.find(r => r.id === id);
   if (!row) return;
   editingId = id;
+  editSource = source;
   document.getElementById('edit-title').textContent = row.client;
   document.getElementById('ed-fact').textContent = row.nr_fact;
   document.getElementById('ed-total').textContent = Number(row.rtotal).toLocaleString('ro-RO', {minimumFractionDigits: 2}) + ' lei';
@@ -471,7 +493,29 @@ async function saveCard() {
   const { error } = await sb.from('expedieri').update(updates).eq('id', editingId);
   if (error) { alert('Eroare salvare: ' + error.message); return; }
   bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
-  await loadToday();
+  if (editSource === 'istoric') {
+    const dateVal = document.getElementById('istoric-date').value;
+    if (dateVal) await loadIstoric(dateVal);
+  } else {
+    await loadToday();
+  }
+}
+
+async function deleteCard() {
+  if (!editingId) return;
+  const pool = editSource === 'istoric' ? istoricData : todayData;
+  const row = pool.find(r => r.id === editingId);
+  if (!row) return;
+  if (!confirm(`Ștergi factura ${row.nr_fact} — ${row.client}?\n\nAcțiunea este ireversibilă.`)) return;
+  const { error } = await sb.from('expedieri').delete().eq('id', editingId);
+  if (error) { alert('Eroare ștergere: ' + error.message); return; }
+  bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
+  if (editSource === 'istoric') {
+    const dateVal = document.getElementById('istoric-date').value;
+    if (dateVal) await loadIstoric(dateVal);
+  } else {
+    await loadToday();
+  }
 }
 
 // ═══ UPLOAD ═══
@@ -594,21 +638,94 @@ async function loadDashboard() {
 async function loadIstoric(dateStr) {
   if (!dateStr) return;
   const { data } = await sb.from('expedieri').select('*').eq('data', dateStr).order('nr_fact');
-  const rows = data || [];
-  if (!rows.length) { document.getElementById('istoric-list').innerHTML = '<p class="text-muted">Nicio expediere în această zi.</p>'; return; }
-  const done = rows.filter(r => getStatus(r) === 'expediat').length;
-  const totalVal = rows.reduce((s, r) => s + Number(r.rtotal), 0);
-  document.getElementById('istoric-list').innerHTML = `
-    <div class="alert alert-info">${rows.length} facturi — ${done} expediate — ${totalVal.toLocaleString('ro-RO', {minimumFractionDigits:2})} lei total</div>
-    <div class="table-responsive"><table class="table table-sm table-striped">
-      <thead><tr><th>Nr. Fact</th><th>Client</th><th>Total</th><th>Picker</th><th>AWB</th><th>Status</th></tr></thead>
-      <tbody>${rows.map(r => {
-        const st = getStatus(r);
-        const picker = r.picker_id ? (users.find(u => u.id === r.picker_id)?.nume || '') : '';
-        const badge = st === 'expediat' ? 'bg-success' : (st === 'in_lucru' ? 'bg-warning text-dark' : 'bg-danger');
-        return `<tr><td>${escHtml(r.nr_fact)}</td><td>${escHtml(r.client)}</td><td class="text-end">${Number(r.rtotal).toLocaleString('ro-RO',{minimumFractionDigits:2})}</td><td>${escHtml(picker)}</td><td>${escHtml(r.nr_awb||'')}</td><td><span class="badge ${badge}">${st}</span></td></tr>`;
-      }).join('')}</tbody>
-    </table></div>`;
+  istoricData = data || [];
+  renderIstoric();
+}
+
+function renderIstoric() {
+  const search = (document.getElementById('istoric-search').value || '').toLowerCase();
+  let filtered = istoricData;
+  if (search) filtered = filtered.filter(r => r.client.toLowerCase().includes(search) || r.nr_fact.includes(search));
+
+  const total = istoricData.length;
+  const done = istoricData.filter(r => getStatus(r) === 'expediat').length;
+  const totalVal = istoricData.reduce((s, r) => s + Number(r.rtotal), 0);
+
+  document.getElementById('istoric-summary').innerHTML = total
+    ? `<div class="alert alert-info py-2 mb-2 small">${total} facturi — <strong>${done} expediate</strong> — ${totalVal.toLocaleString('ro-RO', {minimumFractionDigits:2})} lei total</div>`
+    : '';
+
+  if (!total) {
+    document.getElementById('istoric-list').innerHTML = '<p class="text-muted text-center py-3">Selectează o dată sau nicio expediere în ziua aleasă.</p>';
+    return;
+  }
+
+  document.getElementById('istoric-list').innerHTML = filtered.map(r => {
+    const st = getStatus(r);
+    const checks = countChecks(r);
+    const statusCls = st === 'expediat' ? 'done' : (st === 'in_lucru' ? 'wip' : '');
+    const statusBadge = st === 'expediat' ? '<span class="badge bg-success badge-status">EXPEDIAT</span>'
+      : st === 'in_lucru' ? `<span class="badge bg-warning text-dark badge-status">${checks}/10</span>`
+      : '<span class="badge bg-danger badge-status">NOU</span>';
+    const picker = r.picker_id ? users.find(u => u.id === r.picker_id)?.nume || '' : '';
+    return `
+      <div class="card exp-card ${statusCls} p-3" onclick="openEdit(${r.id}, 'istoric')" style="cursor:pointer;">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="client-name">${escHtml(r.client)}</div>
+            <div class="fact-nr">Fact. ${escHtml(r.nr_fact)} ${picker ? '· <i class="bi bi-person"></i> ' + escHtml(picker) : ''}</div>
+          </div>
+          <div class="text-end">
+            <div class="amount">${Number(r.rtotal).toLocaleString('ro-RO', {minimumFractionDigits: 2})} lei</div>
+            ${statusBadge}
+          </div>
+        </div>
+        ${r.nr_awb ? '<div class="mt-1 small text-muted"><i class="bi bi-truck"></i> AWB: ' + escHtml(r.nr_awb) + '</div>' : ''}
+        ${r.observatii ? '<div class="mt-1 small text-muted"><i class="bi bi-chat-text"></i> ' + escHtml(r.observatii) + '</div>' : ''}
+      </div>`;
+  }).join('');
+}
+
+function exportIstoric() {
+  if (!istoricData.length) { alert('Nu sunt date de exportat. Selectează o dată.'); return; }
+  exportToExcel(istoricData, 'Istoric');
+}
+
+// ═══ EXPORT RAPORT ═══
+async function exportRaport() {
+  const today = todayISO();
+  const { data } = await sb.from('expedieri').select('*').eq('data', today).order('nr_fact');
+  if (!data || !data.length) { alert('Nu sunt date pentru azi.'); return; }
+  exportToExcel(data, 'Raport_' + today);
+}
+
+function exportToExcel(rows, prefix) {
+  const exportRows = rows.map(r => ({
+    'Nr. Factură': r.nr_fact,
+    'Client': r.client,
+    'CUI': r.cod_fiscal,
+    'Total (lei)': Number(r.rtotal),
+    'TVA': Number(r.rtva),
+    'Plată': r.achitat,
+    'Picker': r.picker_id ? (users.find(u => u.id === r.picker_id)?.nume || '') : '',
+    'Verif. Cantitate': r.verificat_cantitate ? 'DA' : '',
+    'Verif. LOT': r.verificat_lot ? 'DA' : '',
+    'Nr. Colete': r.nr_colete || '',
+    'Greutate (kg)': r.greutate_kg || '',
+    'Nr. AWB': r.nr_awb || '',
+    'Lipit AWB': r.lipit_awb ? 'DA' : '',
+    'Aviz+Factură': r.aviz_factura ? 'DA' : '',
+    'Preluat Curier': r.preluat_curier ? 'DA' : '',
+    'Client Notificat': r.client_notificat ? 'DA' : '',
+    'Status': getStatus(r),
+    'Observații': r.observatii || ''
+  }));
+  const ws = XLSX.utils.json_to_sheet(exportRows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Expedieri');
+  ws['!cols'] = [{ wch: 12 }, { wch: 40 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 15 },
+    { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 15 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 30 }];
+  XLSX.writeFile(wb, `${prefix}_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
 // ═══ HELPERS ═══
