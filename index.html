@@ -294,7 +294,7 @@ body { background: #f4f6f9; font-family: 'Segoe UI', system-ui, sans-serif; padd
           </div>
         </div>
         <div class="modal-footer d-flex justify-content-between">
-          <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteCard()">
+          <button type="button" class="btn btn-outline-danger btn-sm" id="btn-delete-card" onclick="deleteCard()">
             <i class="bi bi-trash"></i> Șterge
           </button>
           <div>
@@ -376,11 +376,13 @@ function applyRoleUI() {
   const admin = isAdmin();
   document.querySelectorAll('[data-tab="upload"]').forEach(el => el.style.display = admin ? '' : 'none');
   document.querySelectorAll('[data-tab="dashboard"]').forEach(el => el.style.display = admin ? '' : 'none');
+  document.querySelectorAll('[data-tab="istoric"]').forEach(el => el.style.display = admin ? '' : 'none');
   document.getElementById('user-badge-top').onclick = admin ? openUsers : null;
   document.getElementById('user-badge-top').style.cursor = admin ? 'pointer' : 'default';
   document.getElementById('user-badge-mobile').onclick = admin ? openUsers : null;
   document.getElementById('user-badge-mobile').style.cursor = admin ? 'pointer' : 'default';
   document.getElementById('btn-export-istoric').style.display = admin ? '' : 'none';
+  document.getElementById('btn-delete-card').style.display = admin ? '' : 'none';
 }
 
 // ═══ TABS ═══
@@ -389,7 +391,7 @@ function setupTabs() {
     el.addEventListener('click', e => {
       e.preventDefault();
       const tab = el.dataset.tab;
-      if ((tab === 'upload' || tab === 'dashboard') && !isAdmin()) return;
+      if ((tab === 'upload' || tab === 'dashboard' || tab === 'istoric') && !isAdmin()) return;
       document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
       document.getElementById('tab-' + tab).style.display = 'block';
       document.querySelectorAll('[data-tab]').forEach(a => a.classList.remove('active'));
