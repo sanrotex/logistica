@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>SANROTEX Logistică</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<style>
+:root {
+  --srt-blue: #1a5276;
+  --srt-light: #d6eaf8;
+  --status-none: #e74c3c;
+  --status-wip: #f39c12;
+  --status-done: #27ae60;
+  --status-ok: #2ecc71;
+}
+body { background: #f4f6f9; font-family: 'Segoe UI', system-ui, sans-serif; padding-bottom: 70px; }
+.navbar-srt { background: var(--srt-blue); }
+.navbar-srt .navbar-brand, .navbar-srt .nav-link { color: #fff !important; }
+.navbar-srt .nav-link.active { font-weight: 700; border-bottom: 3px solid #fff; }
+
+/* Login */
+#login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, var(--srt-blue), #2e86c1); }
+#login-screen .card { border: none; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,.2); }
+.btn-srt { background: var(--srt-blue); color: #fff; border: none; }
+.btn-srt:hover { background: #1e6fa0; color: #fff; }
+
+/* Cards */
+.exp-card { border-left: 5px solid var(--status-none); border-radius: 10px; margin-bottom: 10px; transition: all .2s; }
+.exp-card.wip { border-left-color: var(--status-wip); }
+.exp-card.done { border-left-color: var(--status-done); }
+.exp-card.ok { border-left-color: var(--status-ok); }
+.exp-card .client-name { font-weight: 600; font-size: .95rem; }
+.exp-card .fact-nr { color: #666; font-size: .85rem; }
+.exp-card .amount { font-weight: 700; color: var(--srt-blue); }
+.badge-status { font-size: .7rem; }
+
+/* Control form */
+.control-panel { background: #fff; border-radius: 12px; }
+.control-section { border-bottom: 1px solid #eee; padding: 12px 0; }
+.control-section:last-child { border-bottom: none; }
+.form-check-input:checked { background-color: var(--status-done); border-color: var(--status-done); }
+.form-check-input { width: 1.4em; height: 1.4em; }
+.form-check-label { font-size: .95rem; padding-top: 2px; }
+
+/* Dashboard */
+.stat-card { border-radius: 12px; text-align: center; padding: 20px; }
+.stat-card .stat-value { font-size: 2.5rem; font-weight: 800; }
+.stat-card .stat-label { font-size: .85rem; color: #666; }
+
+/* Upload */
+.upload-zone { border: 3px dashed #aaa; border-radius: 16px; padding: 40px; text-align: center; cursor: pointer; transition: all .2s; }
+.upload-zone:hover, .upload-zone.drag-over { border-color: var(--srt-blue); background: var(--srt-light); }
+.upload-zone i { font-size: 3rem; color: #aaa; }
+
+/* Bottom nav mobile */
+.bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid #ddd; z-index: 1050; }
+.bottom-nav .nav-link { color: #666; font-size: .75rem; padding: 8px 0; }
+.bottom-nav .nav-link.active { color: var(--srt-blue); font-weight: 700; }
+.bottom-nav .nav-link i { font-size: 1.3rem; display: block; }
+
+/* Progress bar */
+.progress-today { height: 8px; border-radius: 4px; }
+
+@media (min-width: 768px) {
+  .bottom-nav { display: none; }
+  body { padding-bottom: 0; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ LOGIN ═══ -->
+<div id="login-screen">
+  <div class="card p-4" style="width: 320px;">
+    <h4 class="text-center mb-1" style="color: var(--srt-blue); font-weight: 800;">SANROTEX</h4>
+    <p class="text-center text-muted mb-3">Control Expedieri</p>
+    <label class="form-label fw-bold">Cine ești?</label>
+    <select id="login-user" class="form-select form-select-lg mb-3"></select>
+    <button class="btn btn-srt btn-lg w-100" onclick="doLogin()">Intră</button>
+  </div>
+</div>
+
+<!-- ═══ APP ═══ -->
+<div id="app" style="display:none;">
+
+  <!-- Top navbar (desktop) -->
+  <nav class="navbar navbar-srt navbar-expand d-none d-md-flex">
+    <div class="container-fluid">
+      <span class="navbar-brand fw-bold">SANROTEX Logistică</span>
+      <div class="navbar-nav ms-auto">
+        <a class="nav-link active" href="#" data-tab="azi"><i class="bi bi-list-check"></i> Azi</a>
+        <a class="nav-link" href="#" data-tab="upload"><i class="bi bi-upload"></i> Upload</a>
+        <a class="nav-link" href="#" data-tab="dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a>
+        <a class="nav-link" href="#" data-tab="istoric"><i class="bi bi-calendar3"></i> Istoric</a>
+      </div>
+      <span class="text-white ms-3" id="user-badge-top"></span>
+    </div>
+  </nav>
+
+  <!-- Mobile header -->
+  <div class="d-md-none bg-white border-bottom px-3 py-2 d-flex align-items-center justify-content-between">
+    <strong style="color: var(--srt-blue);">SANROTEX Logistică</strong>
+    <span class="badge bg-secondary" id="user-badge-mobile"></span>
+  </div>
+
+  <!-- ═══ TAB: AZI ═══ -->
+  <div id="tab-azi" class="tab-content container-fluid py-3">
+    <div class="row mb-3 align-items-center">
+      <div class="col">
+        <h5 class="mb-0"><i class="bi bi-calendar-date"></i> <span id="azi-date"></span></h5>
+      </div>
+      <div class="col-auto">
+        <span id="azi-progress-text" class="text-muted small"></span>
+      </div>
+    </div>
+    <div class="progress progress-today mb-3">
+      <div id="azi-progress-bar" class="progress-bar bg-success" role="progressbar" style="width:0%"></div>
+    </div>
+
+    <!-- Filters -->
+    <div class="row g-2 mb-3">
+      <div class="col-6 col-md-3">
+        <select id="filter-status" class="form-select form-select-sm" onchange="renderCards()">
+          <option value="toate">Toate</option>
+          <option value="neprocesat">Neprocesate</option>
+          <option value="in_lucru">În lucru</option>
+          <option value="expediat">Expediate</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-3">
+        <input type="search" id="filter-search" class="form-control form-control-sm" placeholder="Caută client / factură..." oninput="renderCards()">
+      </div>
+    </div>
+
+    <div id="cards-list"></div>
+    <div id="no-data" class="text-center text-muted py-5" style="display:none;">
+      <i class="bi bi-inbox" style="font-size:3rem;"></i>
+      <p class="mt-2">Nicio expediere pentru azi.<br>Uploadează un XLS din ERP.</p>
+    </div>
+  </div>
+
+  <!-- ═══ TAB: UPLOAD ═══ -->
+  <div id="tab-upload" class="tab-content container-fluid py-3" style="display:none;">
+    <h5 class="mb-3"><i class="bi bi-upload"></i> Upload centralizator ieșiri</h5>
+    <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+      <i class="bi bi-file-earmark-spreadsheet"></i>
+      <p class="mt-2 mb-0 text-muted">Click sau trage fișierul XLS/XLSX aici</p>
+    </div>
+    <input type="file" id="file-input" accept=".xls,.xlsx" style="display:none;" onchange="handleFile(this.files[0])">
+
+    <div id="upload-preview" style="display:none;" class="mt-3">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="mb-0"><span id="preview-count"></span> facturi găsite</h6>
+        <div>
+          <span id="preview-date" class="badge bg-info me-2"></span>
+          <button class="btn btn-srt btn-sm" onclick="confirmUpload()">
+            <i class="bi bi-check-lg"></i> Importă
+          </button>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm table-striped" id="preview-table">
+          <thead><tr><th>Nr. Fact</th><th>Client</th><th>Total</th><th>Status</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ TAB: DASHBOARD ═══ -->
+  <div id="tab-dashboard" class="tab-content container-fluid py-3" style="display:none;">
+    <h5 class="mb-3"><i class="bi bi-speedometer2"></i> Dashboard — <span id="dash-date"></span></h5>
+    <div class="row g-3 mb-4" id="dash-stats"></div>
+    <div class="row g-3">
+      <div class="col-12 col-md-6">
+        <div class="card">
+          <div class="card-body">
+            <h6 class="card-title"><i class="bi bi-exclamation-triangle text-warning"></i> Incomplete</h6>
+            <div id="dash-incomplete"></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6">
+        <div class="card">
+          <div class="card-body">
+            <h6 class="card-title"><i class="bi bi-people"></i> Per picker</h6>
+            <div id="dash-pickers"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ TAB: ISTORIC ═══ -->
+  <div id="tab-istoric" class="tab-content container-fluid py-3" style="display:none;">
+    <h5 class="mb-3"><i class="bi bi-calendar3"></i> Istoric expedieri</h5>
+    <input type="date" id="istoric-date" class="form-control mb-3" onchange="loadIstoric(this.value)">
+    <div id="istoric-list"></div>
+  </div>
+
+  <!-- ═══ MODAL: Edit card ═══ -->
+  <div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header" style="background: var(--srt-blue); color: #fff;">
+          <h6 class="modal-title" id="edit-title"></h6>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <!-- ERP info -->
+          <div class="mb-3 p-2 rounded" style="background: #f8f9fa;">
+            <div class="row">
+              <div class="col-6"><small class="text-muted">Factură</small><div id="ed-fact" class="fw-bold"></div></div>
+              <div class="col-6 text-end"><small class="text-muted">Total</small><div id="ed-total" class="fw-bold" style="color: var(--srt-blue);"></div></div>
+            </div>
+            <div class="row mt-1">
+              <div class="col-8"><small class="text-muted">CUI</small><div id="ed-cui" class="small"></div></div>
+              <div class="col-4 text-end"><small class="text-muted">Plată</small><div id="ed-achitat" class="small"></div></div>
+            </div>
+          </div>
+
+          <!-- DEPOZIT -->
+          <div class="control-section">
+            <h6 class="text-uppercase text-muted small fw-bold"><i class="bi bi-box-seam"></i> Depozit — Poarta 1</h6>
+            <div class="mb-2">
+              <label class="form-label small">Picker</label>
+              <select id="ed-picker" class="form-select form-select-sm"></select>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" id="ed-cant">
+              <label class="form-check-label" for="ed-cant">Verificat cantitate</label>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" id="ed-lot">
+              <label class="form-check-label" for="ed-lot">Verificat LOT / expirare</label>
+            </div>
+            <div class="row g-2">
+              <div class="col-6">
+                <label class="form-label small">Nr. colete</label>
+                <input type="number" class="form-control form-control-sm" id="ed-colete" min="0">
+              </div>
+              <div class="col-6">
+                <label class="form-label small">Greutate (kg)</label>
+                <input type="number" class="form-control form-control-sm" id="ed-greutate" min="0" step="0.1">
+              </div>
+            </div>
+          </div>
+
+          <!-- EXPEDITII -->
+          <div class="control-section">
+            <h6 class="text-uppercase text-muted small fw-bold"><i class="bi bi-truck"></i> Expediții — Poarta 2</h6>
+            <div class="mb-2">
+              <label class="form-label small">Nr. AWB</label>
+              <input type="text" class="form-control form-control-sm" id="ed-awb" placeholder="ex: 6005...">
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" id="ed-awb-lipit">
+              <label class="form-check-label" for="ed-awb-lipit">Lipit AWB</label>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" id="ed-aviz">
+              <label class="form-check-label" for="ed-aviz">Aviz + factură atașate</label>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" id="ed-curier">
+              <label class="form-check-label" for="ed-curier">Preluat de curier</label>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" id="ed-notif">
+              <label class="form-check-label" for="ed-notif">Client notificat</label>
+            </div>
+          </div>
+
+          <!-- Observatii -->
+          <div class="control-section">
+            <label class="form-label small">Observații</label>
+            <textarea class="form-control form-control-sm" id="ed-obs" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Anulează</button>
+          <button type="button" class="btn btn-srt btn-sm" onclick="saveCard()">
+            <i class="bi bi-check-lg"></i> Salvează
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom nav (mobile) -->
+  <nav class="bottom-nav d-md-none">
+    <div class="d-flex justify-content-around">
+      <a class="nav-link active text-center" href="#" data-tab="azi"><i class="bi bi-list-check"></i>Azi</a>
+      <a class="nav-link text-center" href="#" data-tab="upload"><i class="bi bi-upload"></i>Upload</a>
+      <a class="nav-link text-center" href="#" data-tab="dashboard"><i class="bi bi-speedometer2"></i>Dashboard</a>
+      <a class="nav-link text-center" href="#" data-tab="istoric"><i class="bi bi-calendar3"></i>Istoric</a>
+    </div>
+  </nav>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script>
+const SUPABASE_URL = 'https://peeehzlhdfzdyzekzdiu.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBlZWVoemxoZGZ6ZHl6ZWt6ZGl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyNDEyODgsImV4cCI6MjA5MTgxNzI4OH0.EzbX5FYEC9IWrJA7HVu2gHDDa7qZn59396u2cbKivxk';
+
+let sb, currentUser = null, users = [], todayData = [], editingId = null;
+
+// ═══ INIT ═══
+async function init() {
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const { data } = await sb.from('utilizatori').select('id, nume').eq('activ', true).order('nume');
+  users = data || [];
+  const sel = document.getElementById('login-user');
+  users.forEach(u => { const o = document.createElement('option'); o.value = u.id; o.textContent = u.nume; sel.appendChild(o); });
+}
+
+function doLogin() {
+  const uid = parseInt(document.getElementById('login-user').value);
+  currentUser = users.find(u => u.id === uid);
+  if (!currentUser) return;
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('user-badge-top').textContent = currentUser.nume;
+  document.getElementById('user-badge-mobile').textContent = currentUser.nume;
+  setupTabs();
+  loadToday();
+}
+
+// ═══ TABS ═══
+function setupTabs() {
+  document.querySelectorAll('[data-tab]').forEach(el => {
+    el.addEventListener('click', e => {
+      e.preventDefault();
+      const tab = el.dataset.tab;
+      document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+      document.getElementById('tab-' + tab).style.display = 'block';
+      document.querySelectorAll('[data-tab]').forEach(a => a.classList.remove('active'));
+      document.querySelectorAll(`[data-tab="${tab}"]`).forEach(a => a.classList.add('active'));
+      if (tab === 'dashboard') loadDashboard();
+      if (tab === 'azi') loadToday();
+    });
+  });
+}
+
+// ═══ AZI ═══
+function todayISO() { return new Date().toISOString().slice(0, 10); }
+
+async function loadToday() {
+  const today = todayISO();
+  document.getElementById('azi-date').textContent = formatDateRO(today);
+  const { data, error } = await sb.from('expedieri').select('*').eq('data', today).order('nr_fact');
+  if (error) { console.error(error); return; }
+  todayData = data || [];
+  renderCards();
+}
+
+function getStatus(row) {
+  const p1 = row.picker_id && row.verificat_cantitate && row.verificat_lot && row.nr_colete > 0;
+  const p2 = row.nr_awb && row.lipit_awb && row.aviz_factura && row.preluat_curier && row.client_notificat;
+  if (p1 && p2) return 'expediat';
+  const any = row.picker_id || row.verificat_cantitate || row.verificat_lot || row.nr_colete ||
+              row.nr_awb || row.lipit_awb || row.aviz_factura || row.preluat_curier || row.client_notificat;
+  return any ? 'in_lucru' : 'neprocesat';
+}
+
+function countChecks(row) {
+  let n = 0;
+  if (row.picker_id) n++;
+  if (row.verificat_cantitate) n++;
+  if (row.verificat_lot) n++;
+  if (row.nr_colete > 0) n++;
+  if (row.greutate_kg > 0) n++;
+  if (row.nr_awb) n++;
+  if (row.lipit_awb) n++;
+  if (row.aviz_factura) n++;
+  if (row.preluat_curier) n++;
+  if (row.client_notificat) n++;
+  return n;
+}
+
+function renderCards() {
+  const filter = document.getElementById('filter-status').value;
+  const search = (document.getElementById('filter-search').value || '').toLowerCase();
+  let filtered = todayData.map(r => ({ ...r, _status: getStatus(r) }));
+  if (filter !== 'toate') filtered = filtered.filter(r => r._status === filter);
+  if (search) filtered = filtered.filter(r => r.client.toLowerCase().includes(search) || r.nr_fact.includes(search));
+
+  const total = todayData.length;
+  const done = todayData.filter(r => getStatus(r) === 'expediat').length;
+  document.getElementById('azi-progress-bar').style.width = total ? (done / total * 100) + '%' : '0%';
+  document.getElementById('azi-progress-text').textContent = total ? `${done}/${total} expediate` : '';
+  document.getElementById('no-data').style.display = total === 0 ? 'block' : 'none';
+
+  const container = document.getElementById('cards-list');
+  container.innerHTML = filtered.map(r => {
+    const st = getStatus(r);
+    const checks = countChecks(r);
+    const statusCls = st === 'expediat' ? 'done' : (st === 'in_lucru' ? 'wip' : '');
+    const statusBadge = st === 'expediat' ? '<span class="badge bg-success badge-status">EXPEDIAT</span>'
+      : st === 'in_lucru' ? `<span class="badge bg-warning text-dark badge-status">${checks}/10</span>`
+      : '<span class="badge bg-danger badge-status">NOU</span>';
+    const picker = r.picker_id ? users.find(u => u.id === r.picker_id)?.nume || '' : '';
+    return `
+      <div class="card exp-card ${statusCls} p-3" onclick="openEdit(${r.id})" style="cursor:pointer;">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="client-name">${escHtml(r.client)}</div>
+            <div class="fact-nr">Fact. ${escHtml(r.nr_fact)} ${picker ? '· <i class="bi bi-person"></i> ' + escHtml(picker) : ''}</div>
+          </div>
+          <div class="text-end">
+            <div class="amount">${Number(r.rtotal).toLocaleString('ro-RO', {minimumFractionDigits: 2})} lei</div>
+            ${statusBadge}
+          </div>
+        </div>
+        ${r.nr_awb ? '<div class="mt-1 small text-muted"><i class="bi bi-truck"></i> AWB: ' + escHtml(r.nr_awb) + '</div>' : ''}
+      </div>`;
+  }).join('');
+}
+
+// ═══ EDIT MODAL ═══
+function openEdit(id) {
+  const row = todayData.find(r => r.id === id);
+  if (!row) return;
+  editingId = id;
+  document.getElementById('edit-title').textContent = row.client;
+  document.getElementById('ed-fact').textContent = row.nr_fact;
+  document.getElementById('ed-total').textContent = Number(row.rtotal).toLocaleString('ro-RO', {minimumFractionDigits: 2}) + ' lei';
+  document.getElementById('ed-cui').textContent = 'CUI: ' + (row.cod_fiscal || '');
+  document.getElementById('ed-achitat').textContent = row.achitat || '';
+
+  // Picker dropdown
+  const pSel = document.getElementById('ed-picker');
+  pSel.innerHTML = '<option value="">— neselectat —</option>';
+  users.forEach(u => { const o = document.createElement('option'); o.value = u.id; o.textContent = u.nume; if (row.picker_id === u.id) o.selected = true; pSel.appendChild(o); });
+
+  document.getElementById('ed-cant').checked = row.verificat_cantitate;
+  document.getElementById('ed-lot').checked = row.verificat_lot;
+  document.getElementById('ed-colete').value = row.nr_colete || '';
+  document.getElementById('ed-greutate').value = row.greutate_kg || '';
+  document.getElementById('ed-awb').value = row.nr_awb || '';
+  document.getElementById('ed-awb-lipit').checked = row.lipit_awb;
+  document.getElementById('ed-aviz').checked = row.aviz_factura;
+  document.getElementById('ed-curier').checked = row.preluat_curier;
+  document.getElementById('ed-notif').checked = row.client_notificat;
+  document.getElementById('ed-obs').value = row.observatii || '';
+
+  new bootstrap.Modal(document.getElementById('editModal')).show();
+}
+
+async function saveCard() {
+  if (!editingId) return;
+  const updates = {
+    picker_id: parseInt(document.getElementById('ed-picker').value) || null,
+    verificat_cantitate: document.getElementById('ed-cant').checked,
+    verificat_lot: document.getElementById('ed-lot').checked,
+    nr_colete: parseInt(document.getElementById('ed-colete').value) || null,
+    greutate_kg: parseFloat(document.getElementById('ed-greutate').value) || null,
+    nr_awb: document.getElementById('ed-awb').value.trim(),
+    lipit_awb: document.getElementById('ed-awb-lipit').checked,
+    aviz_factura: document.getElementById('ed-aviz').checked,
+    preluat_curier: document.getElementById('ed-curier').checked,
+    client_notificat: document.getElementById('ed-notif').checked,
+    observatii: document.getElementById('ed-obs').value.trim(),
+    updated_by: currentUser.id,
+    updated_at: new Date().toISOString()
+  };
+  const { error } = await sb.from('expedieri').update(updates).eq('id', editingId);
+  if (error) { alert('Eroare salvare: ' + error.message); return; }
+  bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
+  await loadToday();
+}
+
+// ═══ UPLOAD ═══
+let pendingRows = [];
+
+function setupUploadZone() {
+  const zone = document.getElementById('upload-zone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag-over'); if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]); });
+}
+
+function handleFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json(ws, { header: ['data','nr_fact','felul','cod_fiscal','furnizor','rtva','rtotal','achitat','idz','idbon','nrbon','cash','card','bonuri'], defval: '' });
+    json.shift(); // remove header row
+
+    pendingRows = json.filter(r => r.nr_fact).map(r => {
+      let d = r.data;
+      if (d instanceof Date) d = d.toISOString().slice(0, 10);
+      else if (typeof d === 'string' && d.includes('-')) d = d.slice(0, 10);
+      else if (typeof d === 'number') { const dt = new Date((d - 25569) * 86400000); d = dt.toISOString().slice(0, 10); }
+      return {
+        data: d,
+        nr_fact: String(Math.round(Number(r.nr_fact) || 0) || r.nr_fact),
+        felul: r.felul || 'Factura',
+        cod_fiscal: String(r.cod_fiscal || '').replace(/\.0$/, ''),
+        client: r.furnizor || '',
+        rtva: Number(r.rtva) || 0,
+        rtotal: Number(r.rtotal) || 0,
+        achitat: r.achitat || ''
+      };
+    });
+
+    if (!pendingRows.length) { alert('Fișierul nu conține facturi valide.'); return; }
+    const firstDate = pendingRows[0].data;
+    document.getElementById('preview-count').textContent = pendingRows.length;
+    document.getElementById('preview-date').textContent = formatDateRO(firstDate);
+    const tbody = document.querySelector('#preview-table tbody');
+    tbody.innerHTML = pendingRows.map(r => `<tr><td>${escHtml(r.nr_fact)}</td><td>${escHtml(r.client)}</td><td class="text-end">${Number(r.rtotal).toLocaleString('ro-RO', {minimumFractionDigits:2})}</td><td>${escHtml(r.achitat)}</td></tr>`).join('');
+    document.getElementById('upload-preview').style.display = 'block';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function confirmUpload() {
+  if (!pendingRows.length) return;
+  const btn = event.target; btn.disabled = true; btn.textContent = 'Se importă...';
+  let inserted = 0, skipped = 0;
+  for (const row of pendingRows) {
+    const { error } = await sb.from('expedieri').upsert(row, { onConflict: 'data,nr_fact', ignoreDuplicates: false });
+    if (error) { console.warn('Skip:', row.nr_fact, error.message); skipped++; }
+    else inserted++;
+  }
+  await sb.from('upload_log').insert({ data_upload: pendingRows[0].data, fisier: document.getElementById('file-input').value.split('\\').pop() || 'upload.xls', nr_facturi: inserted, uploaded_by: currentUser.id });
+  alert(`Import finalizat!\n${inserted} facturi importate${skipped ? ', ' + skipped + ' erori' : ''}.`);
+  btn.disabled = false; btn.textContent = 'Importă';
+  document.getElementById('upload-preview').style.display = 'none';
+  pendingRows = [];
+  // Switch to Azi tab
+  document.querySelector('[data-tab="azi"]').click();
+}
+
+// ═══ DASHBOARD ═══
+async function loadDashboard() {
+  const today = todayISO();
+  document.getElementById('dash-date').textContent = formatDateRO(today);
+  const { data } = await sb.from('expedieri').select('*').eq('data', today);
+  const rows = data || [];
+  const total = rows.length;
+  const done = rows.filter(r => getStatus(r) === 'expediat').length;
+  const wip = rows.filter(r => getStatus(r) === 'in_lucru').length;
+  const none = rows.filter(r => getStatus(r) === 'neprocesat').length;
+  const totalVal = rows.reduce((s, r) => s + Number(r.rtotal), 0);
+
+  document.getElementById('dash-stats').innerHTML = `
+    <div class="col-6 col-md-3"><div class="stat-card bg-white shadow-sm"><div class="stat-value">${total}</div><div class="stat-label">Total facturi</div></div></div>
+    <div class="col-6 col-md-3"><div class="stat-card bg-white shadow-sm"><div class="stat-value text-success">${done}</div><div class="stat-label">Expediate</div></div></div>
+    <div class="col-6 col-md-3"><div class="stat-card bg-white shadow-sm"><div class="stat-value text-warning">${wip}</div><div class="stat-label">În lucru</div></div></div>
+    <div class="col-6 col-md-3"><div class="stat-card bg-white shadow-sm"><div class="stat-value text-danger">${none}</div><div class="stat-label">Neprocesate</div></div></div>
+    <div class="col-12"><div class="stat-card bg-white shadow-sm"><div class="stat-value" style="color:var(--srt-blue);font-size:1.8rem;">${totalVal.toLocaleString('ro-RO', {minimumFractionDigits:2})} lei</div><div class="stat-label">Valoare totală zi</div></div></div>`;
+
+  // Incomplete list
+  const incomplete = rows.filter(r => getStatus(r) !== 'expediat');
+  document.getElementById('dash-incomplete').innerHTML = incomplete.length
+    ? incomplete.map(r => {
+        const missing = [];
+        if (!r.picker_id) missing.push('picker');
+        if (!r.verificat_cantitate) missing.push('cantitate');
+        if (!r.verificat_lot) missing.push('LOT');
+        if (!r.nr_colete) missing.push('colete');
+        if (!r.nr_awb) missing.push('AWB');
+        if (!r.lipit_awb) missing.push('lipit');
+        if (!r.aviz_factura) missing.push('aviz');
+        if (!r.preluat_curier) missing.push('curier');
+        if (!r.client_notificat) missing.push('notif');
+        return `<div class="d-flex justify-content-between align-items-center py-1 border-bottom">
+          <span class="small">${escHtml(r.client)}</span>
+          <span class="badge bg-light text-dark small">lipsă: ${missing.join(', ')}</span></div>`;
+      }).join('')
+    : '<p class="text-success small">Toate expedierile sunt complete!</p>';
+
+  // Per picker
+  const pickerMap = {};
+  rows.forEach(r => {
+    const pn = r.picker_id ? (users.find(u => u.id === r.picker_id)?.nume || '?') : 'Nealocat';
+    pickerMap[pn] = (pickerMap[pn] || 0) + 1;
+  });
+  document.getElementById('dash-pickers').innerHTML = Object.entries(pickerMap)
+    .sort((a, b) => b[1] - a[1])
+    .map(([name, cnt]) => `<div class="d-flex justify-content-between py-1 border-bottom"><span>${escHtml(name)}</span><span class="badge bg-primary">${cnt}</span></div>`)
+    .join('') || '<p class="text-muted small">Niciun picker alocat.</p>';
+}
+
+// ═══ ISTORIC ═══
+async function loadIstoric(dateStr) {
+  if (!dateStr) return;
+  const { data } = await sb.from('expedieri').select('*').eq('data', dateStr).order('nr_fact');
+  const rows = data || [];
+  if (!rows.length) { document.getElementById('istoric-list').innerHTML = '<p class="text-muted">Nicio expediere în această zi.</p>'; return; }
+  const done = rows.filter(r => getStatus(r) === 'expediat').length;
+  const totalVal = rows.reduce((s, r) => s + Number(r.rtotal), 0);
+  document.getElementById('istoric-list').innerHTML = `
+    <div class="alert alert-info">${rows.length} facturi — ${done} expediate — ${totalVal.toLocaleString('ro-RO', {minimumFractionDigits:2})} lei total</div>
+    <div class="table-responsive"><table class="table table-sm table-striped">
+      <thead><tr><th>Nr. Fact</th><th>Client</th><th>Total</th><th>Picker</th><th>AWB</th><th>Status</th></tr></thead>
+      <tbody>${rows.map(r => {
+        const st = getStatus(r);
+        const picker = r.picker_id ? (users.find(u => u.id === r.picker_id)?.nume || '') : '';
+        const badge = st === 'expediat' ? 'bg-success' : (st === 'in_lucru' ? 'bg-warning text-dark' : 'bg-danger');
+        return `<tr><td>${escHtml(r.nr_fact)}</td><td>${escHtml(r.client)}</td><td class="text-end">${Number(r.rtotal).toLocaleString('ro-RO',{minimumFractionDigits:2})}</td><td>${escHtml(picker)}</td><td>${escHtml(r.nr_awb||'')}</td><td><span class="badge ${badge}">${st}</span></td></tr>`;
+      }).join('')}</tbody>
+    </table></div>`;
+}
+
+// ═══ HELPERS ═══
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function formatDateRO(iso) {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+// ═══ START ═══
+setupUploadZone();
+init().catch(e => { console.error(e); alert('Eroare conectare Supabase: ' + e.message); });
+</script>
+</body>
+</html>
