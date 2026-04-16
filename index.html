@@ -95,14 +95,14 @@ body { background: #f4f6f9; font-family: 'Segoe UI', system-ui, sans-serif; padd
         <a class="nav-link" href="#" data-tab="dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a>
         <a class="nav-link" href="#" data-tab="istoric"><i class="bi bi-calendar3"></i> Istoric</a>
       </div>
-      <span class="text-white ms-3" id="user-badge-top"></span>
+      <a class="text-white ms-3" href="#" onclick="openUsers()" style="text-decoration:none;" id="user-badge-top"></a>
     </div>
   </nav>
 
   <!-- Mobile header -->
   <div class="d-md-none bg-white border-bottom px-3 py-2 d-flex align-items-center justify-content-between">
     <strong style="color: var(--srt-blue);">SANROTEX Logistică</strong>
-    <span class="badge bg-secondary" id="user-badge-mobile"></span>
+    <a class="badge bg-secondary" href="#" onclick="openUsers()" style="text-decoration:none;" id="user-badge-mobile"></a>
   </div>
 
   <!-- ═══ TAB: AZI ═══ -->
@@ -308,6 +308,26 @@ body { background: #f4f6f9; font-family: 'Segoe UI', system-ui, sans-serif; padd
     </div>
   </div>
 
+  <!-- ═══ MODAL: Utilizatori ═══ -->
+  <div class="modal fade" id="usersModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header" style="background: var(--srt-blue); color: #fff;">
+          <h6 class="modal-title"><i class="bi bi-people"></i> Gestionare utilizatori</h6>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="users-list"></div>
+          <hr>
+          <div class="input-group input-group-sm">
+            <input type="text" id="new-user-name" class="form-control" placeholder="Nume utilizator nou...">
+            <button class="btn btn-srt" onclick="addUser()"><i class="bi bi-plus-lg"></i> Adaugă</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Bottom nav (mobile) -->
   <nav class="bottom-nav d-md-none">
     <div class="d-flex justify-content-around">
@@ -457,7 +477,8 @@ function openEdit(id, source) {
   // Picker dropdown
   const pSel = document.getElementById('ed-picker');
   pSel.innerHTML = '<option value="">— neselectat —</option>';
-  users.forEach(u => { const o = document.createElement('option'); o.value = u.id; o.textContent = u.nume; if (row.picker_id === u.id) o.selected = true; pSel.appendChild(o); });
+  const pickerId = row.picker_id || currentUser.id;
+  users.forEach(u => { const o = document.createElement('option'); o.value = u.id; o.textContent = u.nume; if (pickerId === u.id) o.selected = true; pSel.appendChild(o); });
 
   document.getElementById('ed-cant').checked = row.verificat_cantitate;
   document.getElementById('ed-lot').checked = row.verificat_lot;
@@ -726,6 +747,65 @@ function exportToExcel(rows, prefix) {
   ws['!cols'] = [{ wch: 12 }, { wch: 40 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 15 },
     { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 15 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 30 }];
   XLSX.writeFile(wb, `${prefix}_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+// ═══ UTILIZATORI ═══
+function openUsers() {
+  renderUsersList();
+  new bootstrap.Modal(document.getElementById('usersModal')).show();
+}
+
+function renderUsersList() {
+  const all = [...users];
+  document.getElementById('users-list').innerHTML = all.map(u => `
+    <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+      <div>
+        <span class="${u.id === currentUser.id ? 'fw-bold' : ''}">${escHtml(u.nume)}</span>
+        ${u.id === currentUser.id ? '<span class="badge bg-primary ms-1">tu</span>' : ''}
+      </div>
+      <div>
+        <button class="btn btn-outline-secondary btn-sm me-1" onclick="renameUser(${u.id}, '${escHtml(u.nume)}')" title="Redenumește"><i class="bi bi-pencil"></i></button>
+        <button class="btn btn-outline-danger btn-sm" onclick="removeUser(${u.id}, '${escHtml(u.nume)}')" title="Dezactivează"><i class="bi bi-person-x"></i></button>
+      </div>
+    </div>`).join('');
+}
+
+async function addUser() {
+  const name = document.getElementById('new-user-name').value.trim();
+  if (!name) return;
+  const { data, error } = await sb.from('utilizatori').insert({ nume: name, rol: 'Operator', activ: true }).select();
+  if (error) { alert('Eroare: ' + error.message); return; }
+  document.getElementById('new-user-name').value = '';
+  await reloadUsers();
+  renderUsersList();
+}
+
+async function renameUser(id, oldName) {
+  const newName = prompt('Nume nou pentru ' + oldName + ':', oldName);
+  if (!newName || newName.trim() === oldName) return;
+  const { error } = await sb.from('utilizatori').update({ nume: newName.trim() }).eq('id', id);
+  if (error) { alert('Eroare: ' + error.message); return; }
+  await reloadUsers();
+  renderUsersList();
+  if (id === currentUser.id) {
+    currentUser.nume = newName.trim();
+    document.getElementById('user-badge-top').textContent = currentUser.nume;
+    document.getElementById('user-badge-mobile').textContent = currentUser.nume;
+  }
+}
+
+async function removeUser(id, name) {
+  if (id === currentUser.id) { alert('Nu te poți dezactiva pe tine.'); return; }
+  if (!confirm('Dezactivezi utilizatorul ' + name + '?\n\nNu va mai apărea la login, dar datele rămân.')) return;
+  const { error } = await sb.from('utilizatori').update({ activ: false }).eq('id', id);
+  if (error) { alert('Eroare: ' + error.message); return; }
+  await reloadUsers();
+  renderUsersList();
+}
+
+async function reloadUsers() {
+  const { data } = await sb.from('utilizatori').select('id, nume').eq('activ', true).order('nume');
+  users = data || [];
 }
 
 // ═══ HELPERS ═══
