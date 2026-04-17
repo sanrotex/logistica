@@ -348,6 +348,180 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 let sb, currentUser = null, users = [], todayData = [], istoricData = [], editingId = null, editSource = 'azi';
 
+// ═══ SINHALA TRANSLATION (for Chatura & Anton) ═══
+const SINHALA_USERS = ['chatura', 'anton'];
+function isSI() { return currentUser && SINHALA_USERS.includes(currentUser.nume.toLowerCase()); }
+
+const SI = {
+  // Login & Nav
+  'Control Expedieri': 'යැවීම් පාලනය',
+  'Cine ești?': 'ඔබ කවුද?',
+  'Intră': 'ඇතුල් වන්න',
+  'SANROTEX Logistică': 'SANROTEX සැපයුම්',
+  'Azi': 'අද',
+  'Upload': 'උඩුගත',
+  'Dashboard': 'උපකරණ පුවරුව',
+  'Istoric': 'ඉතිහාසය',
+  // Filters
+  'Toate': 'සියල්ල',
+  'Neprocesate': 'සකසා නැත',
+  'În lucru': 'සකසමින්',
+  'Expediate': 'යවා ඇත',
+  'Caută client / factură...': 'සේවාදායකයා / ඉන්වොයිසිය සොයන්න...',
+  // No-data
+  'Nicio expediere pentru azi.': 'අද යැවීම් නැත.',
+  'Uploadează un XLS din ERP.': 'ERP වෙතින් XLS උඩුගත කරන්න.',
+  // Status badges
+  'EXPEDIAT': 'යවා ඇත',
+  'NOU': 'අලුත්',
+  // Upload
+  'Upload centralizator ieșiri': 'පිටවීම් සාරාංශය උඩුගත',
+  'Click sau trage fișierul XLS/XLSX aici': 'XLS/XLSX ගොනුව මෙහි ක්ලික් හෝ ඇදගෙන එන්න',
+  'facturi găsite': 'ඉන්වොයිසි සොයා ගත්තා',
+  'Importă': 'ආයාත කරන්න',
+  // Edit modal - Depozit
+  'Depozit — Poarta 1': 'ගබඩාව — දොර 1',
+  'Picker': 'තෝරන්නා',
+  'Verificat cantitate': 'ප්‍රමාණය තහවුරු කළා',
+  'Verificat LOT / expirare': 'LOT / කල් ඉකුත්වීම තහවුරු කළා',
+  'Nr. colete': 'පැකේජ ගණන',
+  'Greutate (kg)': 'බර (kg)',
+  // Edit modal - Expeditii
+  'Expediții — Poarta 2': 'යැවීම් — දොර 2',
+  'Nr. AWB': 'AWB අංකය',
+  'Lipit AWB': 'AWB ඇලවූ',
+  'Aviz + factură atașate': 'දැන්වීම + ඉන්වොයිසිය ඇමිණීම',
+  'Preluat de curier': 'කුරියර් බාර ගත්තා',
+  'Client notificat': 'සේවාදායකයාට දැනුම් දුන්නා',
+  'Observații': 'සටහන්',
+  // Modal buttons
+  'Șterge': 'මකන්න',
+  'Anulează': 'අවලංගු කරන්න',
+  'Salvează': 'සුරකින්න',
+  '— neselectat —': '— තෝරා නැත —',
+  'Factură': 'ඉන්වොයිසිය',
+  'Total': 'එකතුව',
+  'Plată': 'ගෙවීම',
+  // Dashboard
+  'Total facturi': 'මුළු ඉන්වොයිසි',
+  'Valoare totală zi': 'දිනයේ මුළු වටිනාකම',
+  'Incomplete': 'අසම්පූර්ණ',
+  'Per picker': 'තෝරන්නා අනුව',
+  'Toate expedierile sunt complete!': 'සියලු යැවීම් සම්පූර්ණයි!',
+  'Niciun picker alocat.': 'තෝරන්නෙකු වෙන් කර නැත.',
+  'Export raport': 'වාර්තාව අපනයනය',
+  'expediate': 'යවා ඇත',
+  // Istoric
+  'Istoric expedieri': 'යැවීම් ඉතිහාසය',
+  'Selectează o dată sau nicio expediere în ziua aleasă.': 'දිනයක් තෝරන්න හෝ තෝරාගත් දිනයේ යැවීම් නැත.',
+  // Dashboard missing fields
+  'picker': 'තෝරන්නා',
+  'cantitate': 'ප්‍රමාණය',
+  'LOT': 'LOT',
+  'colete': 'පැකේජ',
+  'AWB': 'AWB',
+  'lipit': 'ඇලවූ',
+  'aviz': 'දැන්වීම',
+  'curier': 'කුරියර්',
+  'notif': 'දැනුම්දීම',
+  'lipsă': 'අඩුයි',
+  // Users modal
+  'Gestionare utilizatori': 'පරිශීලක කළමනාකරණය',
+  'Nume utilizator nou...': 'නව පරිශීලක නම...',
+  'Adaugă': 'එකතු කරන්න',
+  // Misc
+  'Export Excel': 'Excel අපනයනය',
+  'lei': 'lei',
+  'Fact.': 'ඉන්වො.',
+  'Nealocat': 'වෙන් කර නැත',
+  'Se importă...': 'ආයාත වෙමින්...',
+  'Import finalizat!': 'ආයාත කිරීම සම්පූර්ණයි!',
+  'facturi importate': 'ඉන්වොයිසි ආයාත කළා',
+  'erori': 'දෝෂ'
+};
+
+function T(key) { return isSI() ? (SI[key] || key) : key; }
+
+function applyLangUI() {
+  if (!isSI()) return;
+  // Nav links
+  document.querySelectorAll('[data-tab="azi"]').forEach(el => { const t = el.querySelector('i'); el.innerHTML = ''; if(t) el.appendChild(t); el.appendChild(document.createTextNode(SI['Azi'])); });
+  document.querySelectorAll('[data-tab="upload"]').forEach(el => { const t = el.querySelector('i'); el.innerHTML = ''; if(t) el.appendChild(t); el.appendChild(document.createTextNode(' ' + SI['Upload'])); });
+  document.querySelectorAll('[data-tab="dashboard"]').forEach(el => { const t = el.querySelector('i'); el.innerHTML = ''; if(t) el.appendChild(t); el.appendChild(document.createTextNode(' ' + SI['Dashboard'])); });
+  document.querySelectorAll('[data-tab="istoric"]').forEach(el => { const t = el.querySelector('i'); el.innerHTML = ''; if(t) el.appendChild(t); el.appendChild(document.createTextNode(' ' + SI['Istoric'])); });
+  // Title bar
+  document.querySelectorAll('.navbar-brand').forEach(el => el.textContent = SI['SANROTEX Logistică']);
+  document.querySelectorAll('.d-md-none strong').forEach(el => { if(el.textContent.includes('SANROTEX')) el.textContent = SI['SANROTEX Logistică']; });
+  // Filter dropdown
+  const fSel = document.getElementById('filter-status');
+  if(fSel) { fSel.options[0].text = SI['Toate']; fSel.options[1].text = SI['Neprocesate']; fSel.options[2].text = SI['În lucru']; fSel.options[3].text = SI['Expediate']; }
+  // Search placeholder
+  const fSr = document.getElementById('filter-search');
+  if(fSr) fSr.placeholder = SI['Caută client / factură...'];
+  const iSr = document.getElementById('istoric-search');
+  if(iSr) iSr.placeholder = SI['Caută client / factură...'];
+  // No-data message
+  const nd = document.getElementById('no-data');
+  if(nd) nd.innerHTML = '<i class="bi bi-inbox" style="font-size:3rem;"></i><p class="mt-2">' + SI['Nicio expediere pentru azi.'] + '<br>' + SI['Uploadează un XLS din ERP.'] + '</p>';
+  // Upload zone
+  const uz = document.getElementById('upload-zone');
+  if(uz) uz.innerHTML = '<i class="bi bi-file-earmark-spreadsheet"></i><p class="mt-2 mb-0 text-muted">' + SI['Click sau trage fișierul XLS/XLSX aici'] + '</p>';
+  // Upload tab title
+  document.querySelectorAll('#tab-upload h5').forEach(el => el.innerHTML = '<i class="bi bi-upload"></i> ' + SI['Upload centralizator ieșiri']);
+  // Istoric tab title
+  document.querySelectorAll('#tab-istoric h5').forEach(el => el.innerHTML = '<i class="bi bi-calendar3"></i> ' + SI['Istoric expedieri']);
+  // Edit modal labels
+  const edLabels = {
+    'ed-cant': SI['Verificat cantitate'],
+    'ed-lot': SI['Verificat LOT / expirare'],
+    'ed-awb-lipit': SI['Lipit AWB'],
+    'ed-aviz': SI['Aviz + factură atașate'],
+    'ed-curier': SI['Preluat de curier'],
+    'ed-notif': SI['Client notificat']
+  };
+  Object.entries(edLabels).forEach(([id, txt]) => {
+    const lbl = document.querySelector('label[for="'+id+'"]');
+    if(lbl) lbl.textContent = txt;
+  });
+  // Static labels in modal
+  document.querySelectorAll('#editModal .control-section h6').forEach(el => {
+    if(el.textContent.includes('Depozit')) el.innerHTML = '<i class="bi bi-box-seam"></i> ' + SI['Depozit — Poarta 1'];
+    if(el.textContent.includes('Expediții')) el.innerHTML = '<i class="bi bi-truck"></i> ' + SI['Expediții — Poarta 2'];
+  });
+  document.querySelectorAll('#editModal label.form-label').forEach(el => {
+    const t = el.textContent.trim();
+    if(t === 'Picker') el.textContent = SI['Picker'];
+    if(t === 'Nr. colete') el.textContent = SI['Nr. colete'];
+    if(t.includes('Greutate')) el.textContent = SI['Greutate (kg)'];
+    if(t === 'Nr. AWB') el.textContent = SI['Nr. AWB'];
+    if(t === 'Observații') el.textContent = SI['Observații'];
+  });
+  // Modal buttons
+  document.querySelectorAll('#editModal .modal-footer .btn-outline-danger').forEach(el => el.innerHTML = '<i class="bi bi-trash"></i> ' + SI['Șterge']);
+  document.querySelectorAll('#editModal .modal-footer .btn-secondary').forEach(el => el.textContent = SI['Anulează']);
+  document.querySelectorAll('#editModal .modal-footer .btn-srt').forEach(el => el.innerHTML = '<i class="bi bi-check-lg"></i> ' + SI['Salvează']);
+  // ERP info labels
+  document.querySelectorAll('#editModal .text-muted').forEach(el => {
+    const t = el.textContent.trim();
+    if(t === 'Factură') el.textContent = SI['Factură'];
+    if(t === 'Total') el.textContent = SI['Total'];
+    if(t === 'Plată') el.textContent = SI['Plată'];
+  });
+  // Export raport button
+  const expBtn = document.querySelector('#tab-dashboard .btn-outline-primary');
+  if(expBtn) expBtn.innerHTML = '<i class="bi bi-file-earmark-excel"></i> ' + SI['Export raport'];
+  // Dashboard headings
+  document.querySelectorAll('#tab-dashboard .card-title').forEach(el => {
+    if(el.textContent.includes('Incomplete')) el.innerHTML = '<i class="bi bi-exclamation-triangle text-warning"></i> ' + SI['Incomplete'];
+    if(el.textContent.includes('Per picker')) el.innerHTML = '<i class="bi bi-people"></i> ' + SI['Per picker'];
+  });
+  // Users modal
+  document.querySelectorAll('#usersModal .modal-title').forEach(el => el.innerHTML = '<i class="bi bi-people"></i> ' + SI['Gestionare utilizatori']);
+  const newUserInput = document.getElementById('new-user-name');
+  if(newUserInput) newUserInput.placeholder = SI['Nume utilizator nou...'];
+  document.querySelectorAll('#usersModal .btn-srt').forEach(el => el.innerHTML = '<i class="bi bi-plus-lg"></i> ' + SI['Adaugă']);
+}
+
 // ═══ INIT ═══
 async function init() {
   sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -368,6 +542,7 @@ function doLogin() {
   document.getElementById('user-badge-top').textContent = currentUser.nume;
   document.getElementById('user-badge-mobile').textContent = currentUser.nume;
   applyRoleUI();
+  applyLangUI();
   setupTabs();
   loadToday();
 }
@@ -448,7 +623,7 @@ function renderCards() {
   const total = todayData.length;
   const done = todayData.filter(r => getStatus(r) === 'expediat').length;
   document.getElementById('azi-progress-bar').style.width = total ? (done / total * 100) + '%' : '0%';
-  document.getElementById('azi-progress-text').textContent = total ? `${done}/${total} expediate` : '';
+  document.getElementById('azi-progress-text').textContent = total ? `${done}/${total} ${T('expediate')}` : '';
   document.getElementById('no-data').style.display = total === 0 ? 'block' : 'none';
 
   const container = document.getElementById('cards-list');
@@ -456,16 +631,16 @@ function renderCards() {
     const st = getStatus(r);
     const checks = countChecks(r);
     const statusCls = st === 'expediat' ? 'done' : (st === 'in_lucru' ? 'wip' : '');
-    const statusBadge = st === 'expediat' ? '<span class="badge bg-success badge-status">EXPEDIAT</span>'
+    const statusBadge = st === 'expediat' ? `<span class="badge bg-success badge-status">${T('EXPEDIAT')}</span>`
       : st === 'in_lucru' ? `<span class="badge bg-warning text-dark badge-status">${checks}/10</span>`
-      : '<span class="badge bg-danger badge-status">NOU</span>';
+      : `<span class="badge bg-danger badge-status">${T('NOU')}</span>`;
     const picker = r.picker_id ? users.find(u => u.id === r.picker_id)?.nume || '' : '';
     return `
       <div class="card exp-card ${statusCls} p-3" onclick="openEdit(${r.id})" style="cursor:pointer;">
         <div class="d-flex justify-content-between align-items-start">
           <div>
             <div class="client-name">${escHtml(r.client)}</div>
-            <div class="fact-nr">Fact. ${escHtml(r.nr_fact)} ${picker ? '· <i class="bi bi-person"></i> ' + escHtml(picker) : ''}</div>
+            <div class="fact-nr">${T('Fact.')} ${escHtml(r.nr_fact)} ${picker ? '· <i class="bi bi-person"></i> ' + escHtml(picker) : ''}</div>
           </div>
           <div class="text-end">
             <div class="amount">${Number(r.rtotal).toLocaleString('ro-RO', {minimumFractionDigits: 2})} lei</div>
@@ -493,7 +668,7 @@ function openEdit(id, source) {
 
   // Picker dropdown
   const pSel = document.getElementById('ed-picker');
-  pSel.innerHTML = '<option value="">— neselectat —</option>';
+  pSel.innerHTML = '<option value="">' + T('— neselectat —') + '</option>';
   const pickerId = row.picker_id || currentUser.id;
   users.forEach(u => { const o = document.createElement('option'); o.value = u.id; o.textContent = u.nume; if (pickerId === u.id) o.selected = true; pSel.appendChild(o); });
 
@@ -613,8 +788,8 @@ async function confirmUpload() {
     else inserted++;
   }
   await sb.from('upload_log').insert({ data_upload: pendingRows[0].data, fisier: document.getElementById('file-input').value.split('\\').pop() || 'upload.xls', nr_facturi: inserted, uploaded_by: currentUser.id });
-  alert(`Import finalizat!\n${inserted} facturi importate${skipped ? ', ' + skipped + ' erori' : ''}.`);
-  btn.disabled = false; btn.textContent = 'Importă';
+  alert(isSI() ? `${SI['Import finalizat!']}\n${inserted} ${SI['facturi importate']}${skipped ? ', ' + skipped + ' ' + SI['erori'] : ''}.` : `Import finalizat!\n${inserted} facturi importate${skipped ? ', ' + skipped + ' erori' : ''}.`);
+  btn.disabled = false; btn.textContent = T('Importă');
   document.getElementById('upload-preview').style.display = 'none';
   pendingRows = [];
   // Switch to Azi tab
@@ -634,42 +809,42 @@ async function loadDashboard() {
   const totalVal = rows.reduce((s, r) => s + Number(r.rtotal), 0);
 
   document.getElementById('dash-stats').innerHTML = `
-    <div class="col-6 col-md-3"><div class="stat-card bg-white shadow-sm"><div class="stat-value">${total}</div><div class="stat-label">Total facturi</div></div></div>
-    <div class="col-6 col-md-3"><div class="stat-card bg-white shadow-sm"><div class="stat-value text-success">${done}</div><div class="stat-label">Expediate</div></div></div>
-    <div class="col-6 col-md-3"><div class="stat-card bg-white shadow-sm"><div class="stat-value text-warning">${wip}</div><div class="stat-label">În lucru</div></div></div>
-    <div class="col-6 col-md-3"><div class="stat-card bg-white shadow-sm"><div class="stat-value text-danger">${none}</div><div class="stat-label">Neprocesate</div></div></div>
-    <div class="col-12"><div class="stat-card bg-white shadow-sm"><div class="stat-value" style="color:var(--srt-blue);font-size:1.8rem;">${totalVal.toLocaleString('ro-RO', {minimumFractionDigits:2})} lei</div><div class="stat-label">Valoare totală zi</div></div></div>`;
+    <div class="col-6 col-md-3"><div class="stat-card bg-white shadow-sm"><div class="stat-value">${total}</div><div class="stat-label">${T('Total facturi')}</div></div></div>
+    <div class="col-6 col-md-3"><div class="stat-card bg-white shadow-sm"><div class="stat-value text-success">${done}</div><div class="stat-label">${T('Expediate')}</div></div></div>
+    <div class="col-6 col-md-3"><div class="stat-card bg-white shadow-sm"><div class="stat-value text-warning">${wip}</div><div class="stat-label">${T('În lucru')}</div></div></div>
+    <div class="col-6 col-md-3"><div class="stat-card bg-white shadow-sm"><div class="stat-value text-danger">${none}</div><div class="stat-label">${T('Neprocesate')}</div></div></div>
+    <div class="col-12"><div class="stat-card bg-white shadow-sm"><div class="stat-value" style="color:var(--srt-blue);font-size:1.8rem;">${totalVal.toLocaleString('ro-RO', {minimumFractionDigits:2})} ${T('lei')}</div><div class="stat-label">${T('Valoare totală zi')}</div></div></div>`;
 
   // Incomplete list
   const incomplete = rows.filter(r => getStatus(r) !== 'expediat');
   document.getElementById('dash-incomplete').innerHTML = incomplete.length
     ? incomplete.map(r => {
         const missing = [];
-        if (!r.picker_id) missing.push('picker');
-        if (!r.verificat_cantitate) missing.push('cantitate');
-        if (!r.verificat_lot) missing.push('LOT');
-        if (!r.nr_colete) missing.push('colete');
-        if (!r.nr_awb) missing.push('AWB');
-        if (!r.lipit_awb) missing.push('lipit');
-        if (!r.aviz_factura) missing.push('aviz');
-        if (!r.preluat_curier) missing.push('curier');
-        if (!r.client_notificat) missing.push('notif');
+        if (!r.picker_id) missing.push(T('picker'));
+        if (!r.verificat_cantitate) missing.push(T('cantitate'));
+        if (!r.verificat_lot) missing.push(T('LOT'));
+        if (!r.nr_colete) missing.push(T('colete'));
+        if (!r.nr_awb) missing.push(T('AWB'));
+        if (!r.lipit_awb) missing.push(T('lipit'));
+        if (!r.aviz_factura) missing.push(T('aviz'));
+        if (!r.preluat_curier) missing.push(T('curier'));
+        if (!r.client_notificat) missing.push(T('notif'));
         return `<div class="d-flex justify-content-between align-items-center py-1 border-bottom">
           <span class="small">${escHtml(r.client)}</span>
-          <span class="badge bg-light text-dark small">lipsă: ${missing.join(', ')}</span></div>`;
+          <span class="badge bg-light text-dark small">${T('lipsă')}: ${missing.join(', ')}</span></div>`;
       }).join('')
-    : '<p class="text-success small">Toate expedierile sunt complete!</p>';
+    : `<p class="text-success small">${T('Toate expedierile sunt complete!')}</p>`;
 
   // Per picker
   const pickerMap = {};
   rows.forEach(r => {
-    const pn = r.picker_id ? (users.find(u => u.id === r.picker_id)?.nume || '?') : 'Nealocat';
+    const pn = r.picker_id ? (users.find(u => u.id === r.picker_id)?.nume || '?') : T('Nealocat');
     pickerMap[pn] = (pickerMap[pn] || 0) + 1;
   });
   document.getElementById('dash-pickers').innerHTML = Object.entries(pickerMap)
     .sort((a, b) => b[1] - a[1])
     .map(([name, cnt]) => `<div class="d-flex justify-content-between py-1 border-bottom"><span>${escHtml(name)}</span><span class="badge bg-primary">${cnt}</span></div>`)
-    .join('') || '<p class="text-muted small">Niciun picker alocat.</p>';
+    .join('') || `<p class="text-muted small">${T('Niciun picker alocat.')}</p>`;
 }
 
 // ═══ ISTORIC ═══
@@ -690,11 +865,11 @@ function renderIstoric() {
   const totalVal = istoricData.reduce((s, r) => s + Number(r.rtotal), 0);
 
   document.getElementById('istoric-summary').innerHTML = total
-    ? `<div class="alert alert-info py-2 mb-2 small">${total} facturi — <strong>${done} expediate</strong> — ${totalVal.toLocaleString('ro-RO', {minimumFractionDigits:2})} lei total</div>`
+    ? `<div class="alert alert-info py-2 mb-2 small">${total} ${T('Total facturi').toLowerCase()} — <strong>${done} ${T('expediate')}</strong> — ${totalVal.toLocaleString('ro-RO', {minimumFractionDigits:2})} ${T('lei')} ${T('Total').toLowerCase()}</div>`
     : '';
 
   if (!total) {
-    document.getElementById('istoric-list').innerHTML = '<p class="text-muted text-center py-3">Selectează o dată sau nicio expediere în ziua aleasă.</p>';
+    document.getElementById('istoric-list').innerHTML = `<p class="text-muted text-center py-3">${T('Selectează o dată sau nicio expediere în ziua aleasă.')}</p>`;
     return;
   }
 
@@ -702,19 +877,19 @@ function renderIstoric() {
     const st = getStatus(r);
     const checks = countChecks(r);
     const statusCls = st === 'expediat' ? 'done' : (st === 'in_lucru' ? 'wip' : '');
-    const statusBadge = st === 'expediat' ? '<span class="badge bg-success badge-status">EXPEDIAT</span>'
+    const statusBadge = st === 'expediat' ? `<span class="badge bg-success badge-status">${T('EXPEDIAT')}</span>`
       : st === 'in_lucru' ? `<span class="badge bg-warning text-dark badge-status">${checks}/10</span>`
-      : '<span class="badge bg-danger badge-status">NOU</span>';
+      : `<span class="badge bg-danger badge-status">${T('NOU')}</span>`;
     const picker = r.picker_id ? users.find(u => u.id === r.picker_id)?.nume || '' : '';
     return `
       <div class="card exp-card ${statusCls} p-3" onclick="openEdit(${r.id}, 'istoric')" style="cursor:pointer;">
         <div class="d-flex justify-content-between align-items-start">
           <div>
             <div class="client-name">${escHtml(r.client)}</div>
-            <div class="fact-nr">Fact. ${escHtml(r.nr_fact)} ${picker ? '· <i class="bi bi-person"></i> ' + escHtml(picker) : ''}</div>
+            <div class="fact-nr">${T('Fact.')} ${escHtml(r.nr_fact)} ${picker ? '· <i class="bi bi-person"></i> ' + escHtml(picker) : ''}</div>
           </div>
           <div class="text-end">
-            <div class="amount">${Number(r.rtotal).toLocaleString('ro-RO', {minimumFractionDigits: 2})} lei</div>
+            <div class="amount">${Number(r.rtotal).toLocaleString('ro-RO', {minimumFractionDigits: 2})} ${T('lei')}</div>
             ${statusBadge}
           </div>
         </div>
