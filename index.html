@@ -540,7 +540,11 @@ function applyLangUI() {
 // ═══ INIT ═══
 async function init() {
   sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  const { data } = await sb.from('utilizatori_logistica').select('id, nume, rol, parola').eq('activ', true).order('nume');
+  let { data, error } = await sb.from('utilizatori_logistica').select('id, nume, rol, parola').eq('activ', true).order('nume');
+  if (error) {
+    const res = await sb.from('utilizatori_logistica').select('id, nume, rol').eq('activ', true).order('nume');
+    data = res.data;
+  }
   users = data || [];
   const sel = document.getElementById('login-user');
   users.forEach(u => { const o = document.createElement('option'); o.value = u.id; o.textContent = u.nume; sel.appendChild(o); });
@@ -1077,7 +1081,11 @@ async function changeRole(id, newRole) {
 }
 
 async function reloadUsers() {
-  const { data } = await sb.from('utilizatori_logistica').select('id, nume, rol, parola').eq('activ', true).order('nume');
+  let { data, error } = await sb.from('utilizatori_logistica').select('id, nume, rol, parola').eq('activ', true).order('nume');
+  if (error) {
+    const res = await sb.from('utilizatori_logistica').select('id, nume, rol').eq('activ', true).order('nume');
+    data = res.data;
+  }
   users = data || [];
 }
 
