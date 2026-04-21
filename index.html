@@ -134,7 +134,7 @@ body { background: #f4f6f9; font-family: 'Segoe UI', system-ui, sans-serif; padd
         </select>
       </div>
       <div class="col-6 col-md-3">
-        <input type="search" id="filter-search" class="form-control form-control-sm" placeholder="Caută client / factură..." oninput="renderCards()">
+        <input type="search" id="filter-search" class="form-control form-control-sm" placeholder="Caută client / factură..." oninput="onSearchInput()">
       </div>
     </div>
 
@@ -449,7 +449,11 @@ const SI = {
   'facturi importate': 'ඉන්වොයිසි ආයාත කළා',
   'erori': 'දෝෂ',
   'Reclamații': 'පැමිණිලි',
-  'Detalii reclamație...': 'පැමිණිලි විස්තර...'
+  'Detalii reclamație...': 'පැමිණිලි විස්තර...',
+  'Căutare reclamații': 'පැමිණිලි සෙවීම',
+  'Caută client / factură / AWB...': 'සේවාදායකයා / ඉන්වොයිසිය / AWB සොයන්න...',
+  'Scrie minim 2 caractere pentru a căuta...': 'සෙවීමට අවම වශයෙන් අකුරු 2ක් ලියන්න...',
+  'Niciun rezultat găsit.': 'ප්‍රතිඵල හමු නොවීය.'
 };
 
 function T(key) { return isSI() ? (SI[key] || key) : key; }
@@ -583,6 +587,7 @@ function doLogin() {
 
 function applyRoleUI() {
   const admin = isAdmin();
+  const recl = isReclamatii();
   document.querySelectorAll('[data-tab="upload"]').forEach(el => el.style.display = admin ? '' : 'none');
   document.querySelectorAll('[data-tab="dashboard"]').forEach(el => el.style.display = admin ? '' : 'none');
   document.querySelectorAll('[data-tab="istoric"]').forEach(el => el.style.display = admin ? '' : 'none');
@@ -592,6 +597,14 @@ function applyRoleUI() {
   document.getElementById('user-badge-mobile').style.cursor = admin ? 'pointer' : 'default';
   document.getElementById('btn-export-istoric').style.display = admin ? '' : 'none';
   document.getElementById('btn-delete-card').style.display = admin ? '' : 'none';
+  // Reclamatii: hide progress, status filter, change header & search placeholder
+  document.getElementById('azi-progress-bar').parentElement.style.display = recl ? 'none' : '';
+  document.getElementById('azi-progress-text').parentElement.style.display = recl ? 'none' : '';
+  document.getElementById('filter-status').parentElement.style.display = recl ? 'none' : '';
+  if (recl) {
+    document.getElementById('filter-search').placeholder = T('Caută client / factură / AWB...');
+    document.getElementById('filter-search').parentElement.className = 'col-12';
+  }
 }
 
 function applyModalRoleUI() {
@@ -627,8 +640,37 @@ function todayISO() { return new Date().toISOString().slice(0, 10); }
 
 async function loadToday() {
   const today = todayISO();
+  if (isReclamatii()) {
+    document.getElementById('azi-date').textContent = T('Căutare reclamații');
+    todayData = [];
+    renderCards();
+    return;
+  }
   document.getElementById('azi-date').textContent = formatDateRO(today);
   const { data, error } = await sb.from('expedieri').select('*').eq('data', today).order('nr_fact');
+  if (error) { console.error(error); return; }
+  todayData = data || [];
+  renderCards();
+}
+
+function onSearchInput() {
+  if (isReclamatii()) {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(searchReclamatii, 400);
+  } else {
+    renderCards();
+  }
+}
+
+let searchTimeout = null;
+async function searchReclamatii() {
+  const search = (document.getElementById('filter-search').value || '').trim();
+  if (search.length < 2) { todayData = []; renderCards(); return; }
+  const q = search.toLowerCase();
+  const { data, error } = await sb.from('expedieri').select('*')
+    .or(`client.ilike.%${q}%,nr_fact.ilike.%${q}%,nr_awb.ilike.%${q}%`)
+    .order('data', { ascending: false })
+    .limit(50);
   if (error) { console.error(error); return; }
   todayData = data || [];
   renderCards();
@@ -662,14 +704,23 @@ function renderCards() {
   const filter = document.getElementById('filter-status').value;
   const search = (document.getElementById('filter-search').value || '').toLowerCase();
   let filtered = todayData.map(r => ({ ...r, _status: getStatus(r) }));
-  if (filter !== 'toate') filtered = filtered.filter(r => r._status === filter);
-  if (search) filtered = filtered.filter(r => r.client.toLowerCase().includes(search) || r.nr_fact.includes(search));
+  if (!isReclamatii()) {
+    if (filter !== 'toate') filtered = filtered.filter(r => r._status === filter);
+    if (search) filtered = filtered.filter(r => r.client.toLowerCase().includes(search) || r.nr_fact.includes(search) || (r.nr_awb || '').toLowerCase().includes(search));
+  }
 
   const total = todayData.length;
   const done = todayData.filter(r => getStatus(r) === 'expediat').length;
   document.getElementById('azi-progress-bar').style.width = total ? (done / total * 100) + '%' : '0%';
   document.getElementById('azi-progress-text').textContent = total ? `${done}/${total} ${T('expediate')}` : '';
-  document.getElementById('no-data').style.display = total === 0 ? 'block' : 'none';
+  if (isReclamatii()) {
+    const noSearch = !document.getElementById('filter-search').value.trim();
+    document.getElementById('no-data').style.display = noSearch ? 'block' : (total === 0 ? 'block' : 'none');
+    if (noSearch) { document.getElementById('no-data').innerHTML = '<i class="bi bi-search" style="font-size:3rem;"></i><p class="mt-2">' + T('Scrie minim 2 caractere pentru a căuta...') + '</p>'; }
+    else if (total === 0) { document.getElementById('no-data').innerHTML = '<i class="bi bi-inbox" style="font-size:3rem;"></i><p class="mt-2">' + T('Niciun rezultat găsit.') + '</p>'; }
+  } else {
+    document.getElementById('no-data').style.display = total === 0 ? 'block' : 'none';
+  }
 
   const container = document.getElementById('cards-list');
   container.innerHTML = filtered.map(r => {
@@ -685,11 +736,11 @@ function renderCards() {
         <div class="d-flex justify-content-between align-items-start">
           <div>
             <div class="client-name">${escHtml(r.client)}</div>
-            <div class="fact-nr">${T('Fact.')} ${escHtml(r.nr_fact)} ${picker ? '· <i class="bi bi-person"></i> ' + escHtml(picker) : ''}</div>
+            <div class="fact-nr">${isReclamatii() ? '<i class="bi bi-calendar3"></i> ' + formatDateRO(r.data) + ' · ' : ''}${T('Fact.')} ${escHtml(r.nr_fact)} ${picker ? '· <i class="bi bi-person"></i> ' + escHtml(picker) : ''}</div>
           </div>
           <div class="text-end">
             <div class="amount">${Number(r.rtotal).toLocaleString('ro-RO', {minimumFractionDigits: 2})} lei</div>
-            ${statusBadge}
+            ${isReclamatii() ? '' : statusBadge}
           </div>
         </div>
         ${r.nr_awb ? '<div class="mt-1 small text-muted"><i class="bi bi-truck"></i> AWB: ' + escHtml(r.nr_awb) + '</div>' : ''}
