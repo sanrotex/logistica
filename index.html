@@ -77,7 +77,11 @@ body { background: #f4f6f9; font-family: 'Segoe UI', system-ui, sans-serif; padd
     <h4 class="text-center mb-1" style="color: var(--srt-blue); font-weight: 800;">SANROTEX</h4>
     <p class="text-center text-muted mb-3">Control Expedieri</p>
     <label class="form-label fw-bold">Cine ești?</label>
-    <select id="login-user" class="form-select form-select-lg mb-3"></select>
+    <select id="login-user" class="form-select form-select-lg mb-3" onchange="toggleLoginPassword()"></select>
+    <div id="login-password-group" style="display:none;">
+      <label class="form-label fw-bold">Parolă</label>
+      <input type="password" id="login-password" class="form-control form-control-lg mb-3" placeholder="Introdu parola...">
+    </div>
     <button class="btn btn-srt btn-lg w-100" onclick="doLogin()">Intră</button>
   </div>
 </div>
@@ -536,10 +540,19 @@ function applyLangUI() {
 // ═══ INIT ═══
 async function init() {
   sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  const { data } = await sb.from('utilizatori_logistica').select('id, nume, rol').eq('activ', true).order('nume');
+  const { data } = await sb.from('utilizatori_logistica').select('id, nume, rol, parola').eq('activ', true).order('nume');
   users = data || [];
   const sel = document.getElementById('login-user');
   users.forEach(u => { const o = document.createElement('option'); o.value = u.id; o.textContent = u.nume; sel.appendChild(o); });
+  toggleLoginPassword();
+}
+
+function toggleLoginPassword() {
+  const uid = parseInt(document.getElementById('login-user').value);
+  const u = users.find(u => u.id === uid);
+  const show = u && u.rol === 'Reclamatii';
+  document.getElementById('login-password-group').style.display = show ? '' : 'none';
+  if (!show) document.getElementById('login-password').value = '';
 }
 
 function isAdmin() { return currentUser && currentUser.rol === 'Admin'; }
@@ -547,8 +560,13 @@ function isReclamatii() { return currentUser && currentUser.rol === 'Reclamatii'
 
 function doLogin() {
   const uid = parseInt(document.getElementById('login-user').value);
-  currentUser = users.find(u => u.id === uid);
-  if (!currentUser) return;
+  const u = users.find(u => u.id === uid);
+  if (!u) return;
+  if (u.rol === 'Reclamatii') {
+    const pass = document.getElementById('login-password').value;
+    if (!u.parola || pass !== u.parola) { alert('Parolă incorectă!'); return; }
+  }
+  currentUser = u;
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   document.getElementById('user-badge-top').textContent = currentUser.nume;
@@ -1001,6 +1019,7 @@ function renderUsersList() {
         </select>
       </div>
       <div>
+        ${u.rol === 'Reclamatii' ? `<button class="btn btn-outline-warning btn-sm me-1" onclick="setPassword(${u.id}, '${escHtml(u.nume)}')" title="Setează parolă"><i class="bi bi-key"></i></button>` : ''}
         <button class="btn btn-outline-secondary btn-sm me-1" onclick="renameUser(${u.id}, '${escHtml(u.nume)}')" title="Redenumește"><i class="bi bi-pencil"></i></button>
         <button class="btn btn-outline-danger btn-sm" onclick="removeUser(${u.id}, '${escHtml(u.nume)}')" title="Dezactivează"><i class="bi bi-person-x"></i></button>
       </div>
@@ -1040,6 +1059,16 @@ async function removeUser(id, name) {
   renderUsersList();
 }
 
+async function setPassword(id, name) {
+  const pass = prompt('Setează parola pentru ' + name + ':');
+  if (pass === null) return;
+  if (!pass.trim()) { alert('Parola nu poate fi goală.'); return; }
+  const { error } = await sb.from('utilizatori_logistica').update({ parola: pass.trim() }).eq('id', id);
+  if (error) { alert('Eroare: ' + error.message); return; }
+  await reloadUsers();
+  alert('Parola a fost setată pentru ' + name + '.');
+}
+
 async function changeRole(id, newRole) {
   const { error } = await sb.from('utilizatori_logistica').update({ rol: newRole }).eq('id', id);
   if (error) { alert('Eroare: ' + error.message); return; }
@@ -1048,7 +1077,7 @@ async function changeRole(id, newRole) {
 }
 
 async function reloadUsers() {
-  const { data } = await sb.from('utilizatori_logistica').select('id, nume, rol').eq('activ', true).order('nume');
+  const { data } = await sb.from('utilizatori_logistica').select('id, nume, rol, parola').eq('activ', true).order('nume');
   users = data || [];
 }
 
