@@ -236,7 +236,7 @@ body { background: #f4f6f9; font-family: 'Segoe UI', system-ui, sans-serif; padd
           </div>
 
           <!-- DEPOZIT -->
-          <div class="control-section">
+          <div class="control-section" id="section-depozit">
             <h6 class="text-uppercase text-muted small fw-bold"><i class="bi bi-box-seam"></i> Depozit — Poarta 1</h6>
             <div class="mb-2">
               <label class="form-label small">Picker</label>
@@ -263,7 +263,7 @@ body { background: #f4f6f9; font-family: 'Segoe UI', system-ui, sans-serif; padd
           </div>
 
           <!-- EXPEDITII -->
-          <div class="control-section">
+          <div class="control-section" id="section-expeditii">
             <h6 class="text-uppercase text-muted small fw-bold"><i class="bi bi-truck"></i> Expediții — Poarta 2</h6>
             <div class="mb-2">
               <label class="form-label small">Nr. AWB</label>
@@ -288,9 +288,15 @@ body { background: #f4f6f9; font-family: 'Segoe UI', system-ui, sans-serif; padd
           </div>
 
           <!-- Observatii -->
-          <div class="control-section">
+          <div class="control-section" id="section-observatii">
             <label class="form-label small">Observații</label>
             <textarea class="form-control form-control-sm" id="ed-obs" rows="2"></textarea>
+          </div>
+
+          <!-- Reclamatii -->
+          <div class="control-section" id="section-reclamatii">
+            <h6 class="text-uppercase text-muted small fw-bold"><i class="bi bi-exclamation-diamond"></i> Reclamații</h6>
+            <textarea class="form-control form-control-sm" id="ed-reclamatii" rows="3" placeholder="Detalii reclamație..."></textarea>
           </div>
         </div>
         <div class="modal-footer d-flex justify-content-between">
@@ -437,7 +443,9 @@ const SI = {
   'Se importă...': 'ආයාත වෙමින්...',
   'Import finalizat!': 'ආයාත කිරීම සම්පූර්ණයි!',
   'facturi importate': 'ඉන්වොයිසි ආයාත කළා',
-  'erori': 'දෝෂ'
+  'erori': 'දෝෂ',
+  'Reclamații': 'පැමිණිලි',
+  'Detalii reclamație...': 'පැමිණිලි විස්තර...'
 };
 
 function T(key) { return isSI() ? (SI[key] || key) : key; }
@@ -487,7 +495,10 @@ function applyLangUI() {
   document.querySelectorAll('#editModal .control-section h6').forEach(el => {
     if(el.textContent.includes('Depozit')) el.innerHTML = '<i class="bi bi-box-seam"></i> ' + SI['Depozit — Poarta 1'];
     if(el.textContent.includes('Expediții')) el.innerHTML = '<i class="bi bi-truck"></i> ' + SI['Expediții — Poarta 2'];
+    if(el.textContent.includes('Reclamații')) el.innerHTML = '<i class="bi bi-exclamation-diamond"></i> ' + SI['Reclamații'];
   });
+  const edRecl = document.getElementById('ed-reclamatii');
+  if(edRecl) edRecl.placeholder = SI['Detalii reclamație...'];
   document.querySelectorAll('#editModal label.form-label').forEach(el => {
     const t = el.textContent.trim();
     if(t === 'Picker') el.textContent = SI['Picker'];
@@ -532,6 +543,7 @@ async function init() {
 }
 
 function isAdmin() { return currentUser && currentUser.rol === 'Admin'; }
+function isReclamatii() { return currentUser && currentUser.rol === 'Reclamatii'; }
 
 function doLogin() {
   const uid = parseInt(document.getElementById('login-user').value);
@@ -560,6 +572,16 @@ function applyRoleUI() {
   document.getElementById('btn-delete-card').style.display = admin ? '' : 'none';
 }
 
+function applyModalRoleUI() {
+  const recl = isReclamatii();
+  const admin = isAdmin();
+  document.getElementById('section-depozit').style.display = recl ? 'none' : '';
+  document.getElementById('section-expeditii').style.display = recl ? 'none' : '';
+  document.getElementById('section-observatii').style.display = recl ? 'none' : '';
+  document.getElementById('section-reclamatii').style.display = (admin || recl) ? '' : 'none';
+  document.getElementById('btn-delete-card').style.display = admin ? '' : 'none';
+}
+
 // ═══ TABS ═══
 function setupTabs() {
   document.querySelectorAll('[data-tab]').forEach(el => {
@@ -567,6 +589,7 @@ function setupTabs() {
       e.preventDefault();
       const tab = el.dataset.tab;
       if ((tab === 'upload' || tab === 'dashboard' || tab === 'istoric') && !isAdmin()) return;
+      if (isReclamatii() && tab !== 'azi') return;
       document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
       document.getElementById('tab-' + tab).style.display = 'block';
       document.querySelectorAll('[data-tab]').forEach(a => a.classList.remove('active'));
@@ -648,6 +671,7 @@ function renderCards() {
           </div>
         </div>
         ${r.nr_awb ? '<div class="mt-1 small text-muted"><i class="bi bi-truck"></i> AWB: ' + escHtml(r.nr_awb) + '</div>' : ''}
+        ${r.reclamatii ? '<div class="mt-1 small text-danger"><i class="bi bi-exclamation-diamond"></i> ' + escHtml(r.reclamatii) + '</div>' : ''}
       </div>`;
   }).join('');
 }
@@ -682,27 +706,39 @@ function openEdit(id, source) {
   document.getElementById('ed-curier').checked = row.preluat_curier;
   document.getElementById('ed-notif').checked = row.client_notificat;
   document.getElementById('ed-obs').value = row.observatii || '';
+  document.getElementById('ed-reclamatii').value = row.reclamatii || '';
 
+  applyModalRoleUI();
   new bootstrap.Modal(document.getElementById('editModal')).show();
 }
 
 async function saveCard() {
   if (!editingId) return;
-  const updates = {
-    picker_id: parseInt(document.getElementById('ed-picker').value) || null,
-    verificat_cantitate: document.getElementById('ed-cant').checked,
-    verificat_lot: document.getElementById('ed-lot').checked,
-    nr_colete: parseInt(document.getElementById('ed-colete').value) || null,
-    greutate_kg: parseFloat(document.getElementById('ed-greutate').value) || null,
-    nr_awb: document.getElementById('ed-awb').value.trim(),
-    lipit_awb: document.getElementById('ed-awb-lipit').checked,
-    aviz_factura: document.getElementById('ed-aviz').checked,
-    preluat_curier: document.getElementById('ed-curier').checked,
-    client_notificat: document.getElementById('ed-notif').checked,
-    observatii: document.getElementById('ed-obs').value.trim(),
-    updated_by: currentUser.id,
-    updated_at: new Date().toISOString()
-  };
+  let updates;
+  if (isReclamatii()) {
+    updates = {
+      reclamatii: document.getElementById('ed-reclamatii').value.trim(),
+      updated_by: currentUser.id,
+      updated_at: new Date().toISOString()
+    };
+  } else {
+    updates = {
+      picker_id: parseInt(document.getElementById('ed-picker').value) || null,
+      verificat_cantitate: document.getElementById('ed-cant').checked,
+      verificat_lot: document.getElementById('ed-lot').checked,
+      nr_colete: parseInt(document.getElementById('ed-colete').value) || null,
+      greutate_kg: parseFloat(document.getElementById('ed-greutate').value) || null,
+      nr_awb: document.getElementById('ed-awb').value.trim(),
+      lipit_awb: document.getElementById('ed-awb-lipit').checked,
+      aviz_factura: document.getElementById('ed-aviz').checked,
+      preluat_curier: document.getElementById('ed-curier').checked,
+      client_notificat: document.getElementById('ed-notif').checked,
+      observatii: document.getElementById('ed-obs').value.trim(),
+      updated_by: currentUser.id,
+      updated_at: new Date().toISOString()
+    };
+    if (isAdmin()) updates.reclamatii = document.getElementById('ed-reclamatii').value.trim();
+  }
   const { error } = await sb.from('expedieri').update(updates).eq('id', editingId);
   if (error) { alert('Eroare salvare: ' + error.message); return; }
   bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
@@ -895,6 +931,7 @@ function renderIstoric() {
         </div>
         ${r.nr_awb ? '<div class="mt-1 small text-muted"><i class="bi bi-truck"></i> AWB: ' + escHtml(r.nr_awb) + '</div>' : ''}
         ${r.observatii ? '<div class="mt-1 small text-muted"><i class="bi bi-chat-text"></i> ' + escHtml(r.observatii) + '</div>' : ''}
+        ${r.reclamatii ? '<div class="mt-1 small text-danger"><i class="bi bi-exclamation-diamond"></i> ' + escHtml(r.reclamatii) + '</div>' : ''}
       </div>`;
   }).join('');
 }
@@ -931,13 +968,14 @@ function exportToExcel(rows, prefix) {
     'Preluat Curier': r.preluat_curier ? 'DA' : '',
     'Client Notificat': r.client_notificat ? 'DA' : '',
     'Status': getStatus(r),
-    'Observații': r.observatii || ''
+    'Observații': r.observatii || '',
+    'Reclamații': r.reclamatii || ''
   }));
   const ws = XLSX.utils.json_to_sheet(exportRows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Expedieri');
   ws['!cols'] = [{ wch: 12 }, { wch: 40 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 15 },
-    { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 15 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 30 }];
+    { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 15 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 30 }, { wch: 40 }];
   XLSX.writeFile(wb, `${prefix}_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
@@ -950,11 +988,17 @@ function openUsers() {
 
 function renderUsersList() {
   const all = [...users];
+  const rolBadge = r => r === 'Admin' ? 'bg-danger' : r === 'Reclamatii' ? 'bg-warning text-dark' : 'bg-secondary';
   document.getElementById('users-list').innerHTML = all.map(u => `
     <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
       <div>
         <span class="${u.id === currentUser.id ? 'fw-bold' : ''}">${escHtml(u.nume)}</span>
         ${u.id === currentUser.id ? '<span class="badge bg-primary ms-1">tu</span>' : ''}
+        <select class="form-select form-select-sm d-inline-block ms-1" style="width:auto;font-size:.75rem;" onchange="changeRole(${u.id}, this.value)" ${u.id === currentUser.id ? 'disabled' : ''}>
+          <option value="Operator" ${u.rol === 'Operator' ? 'selected' : ''}>Operator</option>
+          <option value="Admin" ${u.rol === 'Admin' ? 'selected' : ''}>Admin</option>
+          <option value="Reclamatii" ${u.rol === 'Reclamatii' ? 'selected' : ''}>Reclamații</option>
+        </select>
       </div>
       <div>
         <button class="btn btn-outline-secondary btn-sm me-1" onclick="renameUser(${u.id}, '${escHtml(u.nume)}')" title="Redenumește"><i class="bi bi-pencil"></i></button>
@@ -991,6 +1035,13 @@ async function removeUser(id, name) {
   if (id === currentUser.id) { alert('Nu te poți dezactiva pe tine.'); return; }
   if (!confirm('Dezactivezi utilizatorul ' + name + '?\n\nNu va mai apărea la login, dar datele rămân.')) return;
   const { error } = await sb.from('utilizatori_logistica').update({ activ: false }).eq('id', id);
+  if (error) { alert('Eroare: ' + error.message); return; }
+  await reloadUsers();
+  renderUsersList();
+}
+
+async function changeRole(id, newRole) {
+  const { error } = await sb.from('utilizatori_logistica').update({ rol: newRole }).eq('id', id);
   if (error) { alert('Eroare: ' + error.message); return; }
   await reloadUsers();
   renderUsersList();
