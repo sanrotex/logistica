@@ -818,6 +818,8 @@ async function saveCard() {
   if (editSource === 'istoric') {
     const dateVal = document.getElementById('istoric-date').value;
     if (dateVal) await loadIstoric(dateVal);
+  } else if (isReclamatii()) {
+    await searchReclamatii();
   } else {
     await loadToday();
   }
