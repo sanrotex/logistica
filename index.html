@@ -203,16 +203,28 @@ body { background: #f4f6f9; font-family: 'Segoe UI', system-ui, sans-serif; padd
   <!-- ═══ TAB: ISTORIC ═══ -->
   <div id="tab-istoric" class="tab-content container-fluid py-3" style="display:none;">
     <h5 class="mb-3"><i class="bi bi-calendar3"></i> Istoric expedieri</h5>
-    <div class="row g-2 mb-3">
-      <div class="col-5">
-        <input type="date" id="istoric-date" class="form-control form-control-sm" onchange="loadIstoric(this.value)">
+    <div class="row g-2 mb-2">
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-0">De la</label>
+        <input type="date" id="istoric-date-from" class="form-control form-control-sm" onchange="loadIstoric()">
       </div>
-      <div class="col-5">
-        <input type="search" id="istoric-search" class="form-control form-control-sm" placeholder="Caută client / factură..." oninput="renderIstoric()">
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-0">Până la</label>
+        <input type="date" id="istoric-date-to" class="form-control form-control-sm" onchange="loadIstoric()">
       </div>
-      <div class="col-2">
-        <button class="btn btn-outline-secondary btn-sm w-100" id="btn-export-istoric" onclick="exportIstoric()" title="Export Excel"><i class="bi bi-download"></i></button>
+      <div class="col-12 col-md-4">
+        <label class="form-label small mb-0">Caută</label>
+        <input type="search" id="istoric-search" class="form-control form-control-sm" placeholder="Client / factură / AWB..." oninput="renderIstoric()">
       </div>
+      <div class="col-12 col-md-2 d-flex align-items-end">
+        <button class="btn btn-outline-secondary btn-sm w-100" id="btn-export-istoric" onclick="exportIstoric()" title="Export Excel"><i class="bi bi-download"></i> Export</button>
+      </div>
+    </div>
+    <div class="row g-1 mb-3">
+      <div class="col-auto"><button class="btn btn-outline-primary btn-sm" onclick="setIstoricRange('today')">Azi</button></div>
+      <div class="col-auto"><button class="btn btn-outline-primary btn-sm" onclick="setIstoricRange('week')">Săpt. curentă</button></div>
+      <div class="col-auto"><button class="btn btn-outline-primary btn-sm" onclick="setIstoricRange('month')">Luna curentă</button></div>
+      <div class="col-auto"><button class="btn btn-outline-primary btn-sm" onclick="setIstoricRange('30d')">Ultimele 30 zile</button></div>
     </div>
     <div id="istoric-summary" class="mb-3"></div>
     <div id="istoric-list"></div>
@@ -424,6 +436,7 @@ const SI = {
   // Istoric
   'Istoric expedieri': 'යැවීම් ඉතිහාසය',
   'Selectează o dată sau nicio expediere în ziua aleasă.': 'දිනයක් තෝරන්න හෝ තෝරාගත් දිනයේ යැවීම් නැත.',
+  'Selectează un interval sau nicio expediere în perioada aleasă.': 'කාල පරාසයක් තෝරන්න හෝ තෝරාගත් කාල පරාසයේ යැවීම් නැත.',
   // Dashboard missing fields
   'picker': 'තෝරන්නා',
   'cantitate': 'ප්‍රමාණය',
@@ -816,8 +829,7 @@ async function saveCard() {
   if (error) { alert('Eroare salvare: ' + error.message); return; }
   bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
   if (editSource === 'istoric') {
-    const dateVal = document.getElementById('istoric-date').value;
-    if (dateVal) await loadIstoric(dateVal);
+    await loadIstoric();
   } else if (isReclamatii()) {
     await searchReclamatii();
   } else {
@@ -835,8 +847,7 @@ async function deleteCard() {
   if (error) { alert('Eroare ștergere: ' + error.message); return; }
   bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
   if (editSource === 'istoric') {
-    const dateVal = document.getElementById('istoric-date').value;
-    if (dateVal) await loadIstoric(dateVal);
+    await loadIstoric();
   } else {
     await loadToday();
   }
@@ -959,9 +970,30 @@ async function loadDashboard() {
 }
 
 // ═══ ISTORIC ═══
-async function loadIstoric(dateStr) {
-  if (!dateStr) return;
-  const { data } = await sb.from('expedieri').select('*').eq('data', dateStr).order('nr_fact');
+function setIstoricRange(kind) {
+  const today = new Date();
+  let from = new Date(today), to = new Date(today);
+  if (kind === 'week') {
+    const dow = (today.getDay() + 6) % 7; // Mon=0..Sun=6
+    from.setDate(today.getDate() - dow);
+  } else if (kind === 'month') {
+    from = new Date(today.getFullYear(), today.getMonth(), 1);
+  } else if (kind === '30d') {
+    from.setDate(today.getDate() - 29);
+  }
+  document.getElementById('istoric-date-from').value = from.toISOString().slice(0, 10);
+  document.getElementById('istoric-date-to').value = to.toISOString().slice(0, 10);
+  loadIstoric();
+}
+
+async function loadIstoric() {
+  const from = document.getElementById('istoric-date-from').value;
+  const to = document.getElementById('istoric-date-to').value;
+  if (!from && !to) { istoricData = []; renderIstoric(); return; }
+  let q = sb.from('expedieri').select('*');
+  if (from) q = q.gte('data', from);
+  if (to) q = q.lte('data', to);
+  const { data } = await q.order('data', { ascending: false }).order('nr_fact');
   istoricData = data || [];
   renderIstoric();
 }
@@ -969,18 +1001,24 @@ async function loadIstoric(dateStr) {
 function renderIstoric() {
   const search = (document.getElementById('istoric-search').value || '').toLowerCase();
   let filtered = istoricData;
-  if (search) filtered = filtered.filter(r => r.client.toLowerCase().includes(search) || r.nr_fact.includes(search));
+  if (search) filtered = filtered.filter(r => r.client.toLowerCase().includes(search) || r.nr_fact.includes(search) || (r.nr_awb || '').toLowerCase().includes(search));
 
   const total = istoricData.length;
   const done = istoricData.filter(r => getStatus(r) === 'expediat').length;
   const totalVal = istoricData.reduce((s, r) => s + Number(r.rtotal), 0);
 
+  const fromD = document.getElementById('istoric-date-from').value;
+  const toD = document.getElementById('istoric-date-to').value;
+  const rangeLabel = (fromD && toD && fromD !== toD)
+    ? `${formatDateRO(fromD)} → ${formatDateRO(toD)}`
+    : (fromD ? formatDateRO(fromD) : '');
+
   document.getElementById('istoric-summary').innerHTML = total
-    ? `<div class="alert alert-info py-2 mb-2 small">${total} ${T('Total facturi').toLowerCase()} — <strong>${done} ${T('expediate')}</strong> — ${totalVal.toLocaleString('ro-RO', {minimumFractionDigits:2})} ${T('lei')} ${T('Total').toLowerCase()}</div>`
+    ? `<div class="alert alert-info py-2 mb-2 small">${rangeLabel ? '<strong>' + rangeLabel + '</strong> · ' : ''}${total} ${T('Total facturi').toLowerCase()} — <strong>${done} ${T('expediate')}</strong> — ${totalVal.toLocaleString('ro-RO', {minimumFractionDigits:2})} ${T('lei')} ${T('Total').toLowerCase()}</div>`
     : '';
 
   if (!total) {
-    document.getElementById('istoric-list').innerHTML = `<p class="text-muted text-center py-3">${T('Selectează o dată sau nicio expediere în ziua aleasă.')}</p>`;
+    document.getElementById('istoric-list').innerHTML = `<p class="text-muted text-center py-3">${T('Selectează un interval sau nicio expediere în perioada aleasă.')}</p>`;
     return;
   }
 
@@ -997,7 +1035,7 @@ function renderIstoric() {
         <div class="d-flex justify-content-between align-items-start">
           <div>
             <div class="client-name">${escHtml(r.client)}</div>
-            <div class="fact-nr">${T('Fact.')} ${escHtml(r.nr_fact)} ${picker ? '· <i class="bi bi-person"></i> ' + escHtml(picker) : ''}</div>
+            <div class="fact-nr"><i class="bi bi-calendar3"></i> ${formatDateRO(r.data)} · ${T('Fact.')} ${escHtml(r.nr_fact)} ${picker ? '· <i class="bi bi-person"></i> ' + escHtml(picker) : ''}</div>
           </div>
           <div class="text-end">
             <div class="amount">${Number(r.rtotal).toLocaleString('ro-RO', {minimumFractionDigits: 2})} ${T('lei')}</div>
@@ -1012,8 +1050,11 @@ function renderIstoric() {
 }
 
 function exportIstoric() {
-  if (!istoricData.length) { alert('Nu sunt date de exportat. Selectează o dată.'); return; }
-  exportToExcel(istoricData, 'Istoric');
+  if (!istoricData.length) { alert('Nu sunt date de exportat. Selectează un interval.'); return; }
+  const from = document.getElementById('istoric-date-from').value;
+  const to = document.getElementById('istoric-date-to').value;
+  const suffix = (from && to && from !== to) ? `${from}_${to}` : (from || 'export');
+  exportToExcel(istoricData, 'Istoric_' + suffix);
 }
 
 // ═══ EXPORT RAPORT ═══
@@ -1051,7 +1092,7 @@ function exportToExcel(rows, prefix) {
   XLSX.utils.book_append_sheet(wb, ws, 'Expedieri');
   ws['!cols'] = [{ wch: 12 }, { wch: 40 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 15 },
     { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 15 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 30 }, { wch: 40 }];
-  XLSX.writeFile(wb, `${prefix}_${new Date().toISOString().slice(0,10)}.xlsx`);
+  XLSX.writeFile(wb, prefix.includes('Istoric_') ? `${prefix}.xlsx` : `${prefix}_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
 // ═══ UTILIZATORI ═══
