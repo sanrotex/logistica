@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1a5276">
+<title>Licitații SANROTEX</title>
+<style>
+  *,*::before,*::after { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f4f6f9;
+    color: #2c3e50;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  header {
+    background: #1a5276;
+    color: white;
+    padding: 12px 16px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  }
+  header h1 {
+    margin: 0 0 8px;
+    font-size: 18px;
+    font-weight: 600;
+  }
+  header .stats {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+    opacity: 0.95;
+  }
+  .filters {
+    background: white;
+    padding: 10px 12px;
+    border-bottom: 1px solid #e0e0e0;
+    display: grid;
+    gap: 8px;
+  }
+  .filters select, .filters input {
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid #ccd1d9;
+    border-radius: 6px;
+    font-size: 14px;
+    background: white;
+    color: #2c3e50;
+    appearance: none;
+  }
+  .filters input:focus, .filters select:focus {
+    outline: none;
+    border-color: #1a5276;
+  }
+  .row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  main {
+    padding: 8px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .empty, .loading {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6c757d;
+  }
+  .card {
+    background: white;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    border-left: 4px solid #ccc;
+    cursor: pointer;
+    transition: transform 0.05s;
+  }
+  .card:active { transform: scale(0.99); }
+  .card.urgent { border-left-color: #e74c3c; background: #fdedec; }
+  .card.azi { border-left-color: #e67e22; background: #fef5e7; }
+  .card.curand { border-left-color: #f1c40f; background: #fffbea; }
+
+  .card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .cod {
+    font-weight: 700;
+    font-size: 13px;
+    color: #1a5276;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  }
+  .resp {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: #ecf0f1;
+    color: #34495e;
+    white-space: nowrap;
+    font-weight: 600;
+  }
+  .resp.melania { background: #FF1493; color: white; }
+  .resp.raluca  { background: #3498DB; color: white; }
+  .resp.elena   { background: #27AE60; color: white; }
+  .resp.alexandru { background: #FDE68A; color: #5a4500; }
+
+  .titlu {
+    font-weight: 600;
+    margin: 4px 0;
+    font-size: 14px;
+    line-height: 1.3;
+  }
+  .autoritate {
+    font-size: 12px;
+    color: #5a6c7d;
+    margin-bottom: 6px;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 11px;
+    align-items: center;
+  }
+  .badge {
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #ecf0f1;
+    color: #34495e;
+  }
+  .badge.termen {
+    background: #d6eaf8;
+    color: #1a5276;
+    font-weight: 600;
+  }
+  .badge.urgent  { background: #e74c3c; color: white; }
+  .badge.azi     { background: #e67e22; color: white; }
+  .badge.curand  { background: #f1c40f; color: #5a4500; }
+  .badge.clarif  { background: #fef9e7; color: #7d6608; }
+  .badge.faza    { background: #d6eaf8; color: #1a5276; }
+  .badge.valoare { background: #d5f5e3; color: #196f3d; font-weight: 600; }
+
+  /* Detail modal */
+  .modal-bg {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 100;
+  }
+  .modal-bg.open { display: flex; }
+  .modal {
+    background: white;
+    width: 100%;
+    max-width: 600px;
+    max-height: 85vh;
+    overflow-y: auto;
+    border-radius: 14px 14px 0 0;
+    padding: 18px;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.25);
+  }
+  .modal h2 {
+    margin: 0 0 4px;
+    font-size: 16px;
+    color: #1a5276;
+  }
+  .modal .row {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    padding: 6px 0;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 13px;
+  }
+  .modal .row b {
+    color: #5a6c7d;
+    font-weight: 600;
+  }
+  .modal .obs {
+    margin-top: 10px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    white-space: pre-wrap;
+    font-size: 13px;
+  }
+  .modal .actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .modal .actions a, .modal .actions button {
+    flex: 1;
+    padding: 10px 12px;
+    text-align: center;
+    border-radius: 8px;
+    border: none;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .modal .actions a { background: #1a5276; color: white; }
+  .modal .actions button { background: #ecf0f1; color: #2c3e50; }
+
+  @media (min-width: 600px) {
+    .row-2 { grid-template-columns: 1fr 1fr 2fr; }
+    .row-2 input.search { grid-column: span 1; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>📋 Licitații SANROTEX</h1>
+  <div class="stats" id="stats">se încarcă...</div>
+</header>
+
+<div class="filters">
+  <div class="row-2">
+    <select id="f-faza">
+      <option value="">Toate fazele</option>
+    </select>
+    <select id="f-resp">
+      <option value="">Toți responsabilii</option>
+    </select>
+  </div>
+  <input type="text" class="search" id="f-search" placeholder="🔍 Caută cod, titlu, autoritate...">
+</div>
+
+<main>
+  <div class="loading" id="loading">⏳ Se încarcă licitațiile...</div>
+  <div id="list"></div>
+</main>
+
+<div class="modal-bg" id="modal" onclick="if(event.target.id==='modal') closeModal()">
+  <div class="modal" id="modal-body"></div>
+</div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const SUPABASE_URL = 'https://peeehzlhdfzdyzekzdiu.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBlZWVoemxoZGZ6ZHl6ZWt6ZGl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyNDEyODgsImV4cCI6MjA5MTgxNzI4OH0.EzbX5FYEC9IWrJA7HVu2gHDDa7qZn59396u2cbKivxk';
+
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const ACTIVE_FAZE_EXCLUDE = new Set(["Castigata", "Pierduta", "Anulata", "Renuntata"]);
+
+let allRows = [];
+let users = {};
+
+function fmtDate(s) {
+  if (!s) return '—';
+  const d = String(s).slice(0, 10);
+  if (!d.match(/^\d{4}-\d{2}-\d{2}$/)) return s;
+  return d.split('-').reverse().join('/');
+}
+
+function fmtValoare(v) {
+  if (!v) return '—';
+  const n = Number(v);
+  if (isNaN(n)) return v;
+  return n.toLocaleString('ro-RO', { maximumFractionDigits: 0 }) + ' RON';
+}
+
+function termenStatus(data_limita, faza) {
+  if (!data_limita || ACTIVE_FAZE_EXCLUDE.has(faza)) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const dl = new Date(data_limita);
+  const diff = Math.floor((dl - today) / 86400000);
+  if (diff < 0) return 'urgent';
+  if (diff === 0) return 'azi';
+  if (diff <= 5) return 'curand';
+  return null;
+}
+
+function userClass(name) {
+  if (!name) return '';
+  const first = String(name).trim().split(/\s+/)[0].toLowerCase();
+  return first;
+}
+
+function fixLink(cod, link) {
+  if (!link || !link.includes('/notices/c-notice/')) return link;
+  const c = (cod || '').toUpperCase();
+  if (c.startsWith('SCN')) return link.replace('/notices/c-notice/', '/notices/simplified-notice/');
+  if (c.startsWith('RFQ')) return link.replace('/notices/c-notice/', '/notices/rfq-notice/');
+  if (c.startsWith('ADV')) return link.replace('/notices/c-notice/', '/notices/adv-notice/');
+  return link;
+}
+
+function renderCard(r) {
+  const status = termenStatus(r.data_limita, r.faza);
+  const cls = status ? ' ' + status : '';
+  const respName = users[r.responsabil_id] || '';
+  const respCls = userClass(respName);
+  const termenCls = status || 'termen';
+
+  return `
+    <div class="card${cls}" data-id="${r.id}">
+      <div class="card-head">
+        <span class="cod">${r.cod || '—'}</span>
+        ${respName ? `<span class="resp ${respCls}">${respName}</span>` : ''}
+      </div>
+      <div class="titlu">${escapeHtml(r.denumire || '—')}</div>
+      <div class="autoritate">🏛️ ${escapeHtml(r.autoritate || '—')}</div>
+      <div class="meta">
+        <span class="badge ${termenCls}">⏰ ${fmtDate(r.data_limita)}</span>
+        ${r.data_clarificari ? `<span class="badge clarif">📋 clarif. ${fmtDate(r.data_clarificari)}</span>` : ''}
+        <span class="badge faza">${escapeHtml(r.faza || '—')}</span>
+        ${r.valoare_est ? `<span class="badge valoare">${fmtValoare(r.valoare_est)}</span>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function applyFilters() {
+  const faza = document.getElementById('f-faza').value;
+  const resp = document.getElementById('f-resp').value;
+  const search = document.getElementById('f-search').value.toLowerCase().trim();
+
+  const filtered = allRows.filter(r => {
+    if (faza && r.faza !== faza) return false;
+    if (resp) {
+      if (resp === '__none__') {
+        if (r.responsabil_id) return false;
+      } else if (String(r.responsabil_id) !== resp) return false;
+    }
+    if (search) {
+      const hay = [r.cod, r.denumire, r.autoritate].filter(Boolean).join(' ').toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+
+  filtered.sort((a, b) => {
+    const da = a.data_limita || '9999';
+    const db = b.data_limita || '9999';
+    return da.localeCompare(db);
+  });
+
+  document.getElementById('list').innerHTML = filtered.map(renderCard).join('') ||
+    '<div class="empty">Nicio licitație nu corespunde filtrelor.</div>';
+
+  const urgent = filtered.filter(r => termenStatus(r.data_limita, r.faza) === 'urgent').length;
+  const azi = filtered.filter(r => termenStatus(r.data_limita, r.faza) === 'azi').length;
+  document.getElementById('stats').innerHTML =
+    `${filtered.length} licitații` +
+    (urgent ? ` · <span style="color:#f8d7da">⛔ ${urgent} expirate</span>` : '') +
+    (azi ? ` · <span style="color:#fcf8d4">⚠ ${azi} azi</span>` : '');
+}
+
+function showModal(id) {
+  const r = allRows.find(x => x.id == id);
+  if (!r) return;
+  const respName = users[r.responsabil_id] || '—';
+  const link = fixLink(r.cod, r.link);
+  const body = document.getElementById('modal-body');
+  body.innerHTML = `
+    <h2>${escapeHtml(r.cod || '—')}</h2>
+    <div style="color:#5a6c7d;font-size:13px;margin-bottom:10px;">${escapeHtml(r.denumire || '')}</div>
+    <div class="row"><b>Autoritate</b><span>${escapeHtml(r.autoritate || '—')}</span></div>
+    <div class="row"><b>Tip</b><span>${escapeHtml(r.tip || '—')}</span></div>
+    <div class="row"><b>CPV</b><span>${escapeHtml(r.cpv || '—')}</span></div>
+    <div class="row"><b>Termen depunere</b><span><strong>${fmtDate(r.data_limita)}</strong></span></div>
+    <div class="row"><b>Termen clarificări</b><span>${fmtDate(r.data_clarificari)}</span></div>
+    <div class="row"><b>Data publicare</b><span>${fmtDate(r.data_publicare)}</span></div>
+    <div class="row"><b>Valoare estimată</b><span>${fmtValoare(r.valoare_est)}</span></div>
+    <div class="row"><b>Faza</b><span>${escapeHtml(r.faza || '—')}</span></div>
+    <div class="row"><b>Responsabil</b><span>${escapeHtml(respName)}</span></div>
+    ${r.observatii ? `<div class="obs"><b>Observații:</b><br>${escapeHtml(r.observatii)}</div>` : ''}
+    <div class="actions">
+      ${link ? `<a href="${link}" target="_blank" rel="noopener">🔗 Deschide SEAP</a>` : ''}
+      <button onclick="window.closeModal()">Închide</button>
+    </div>
+  `;
+  document.getElementById('modal').classList.add('open');
+}
+window.closeModal = () => document.getElementById('modal').classList.remove('open');
+
+document.getElementById('list').addEventListener('click', e => {
+  const card = e.target.closest('.card');
+  if (card) showModal(card.dataset.id);
+});
+
+['f-faza', 'f-resp', 'f-search'].forEach(id => {
+  document.getElementById(id).addEventListener('input', applyFilters);
+});
+
+async function load() {
+  try {
+    const [licResp, usersResp] = await Promise.all([
+      sb.from('licitatii').select('*').order('data_limita', { ascending: true, nullsFirst: false }),
+      sb.from('utilizatori').select('id, nume, activ'),
+    ]);
+
+    if (licResp.error) throw licResp.error;
+    if (usersResp.error) throw usersResp.error;
+
+    allRows = licResp.data || [];
+    users = Object.fromEntries((usersResp.data || []).map(u => [u.id, u.nume]));
+
+    // populate filters
+    const faze = [...new Set(allRows.map(r => r.faza).filter(Boolean))].sort();
+    const fFaza = document.getElementById('f-faza');
+    faze.forEach(f => {
+      const opt = document.createElement('option');
+      opt.value = f; opt.textContent = f;
+      fFaza.appendChild(opt);
+    });
+
+    const fResp = document.getElementById('f-resp');
+    (usersResp.data || []).filter(u => u.activ).forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = String(u.id); opt.textContent = u.nume;
+      fResp.appendChild(opt);
+    });
+    const noneOpt = document.createElement('option');
+    noneOpt.value = '__none__'; noneOpt.textContent = '(fără responsabil)';
+    fResp.appendChild(noneOpt);
+
+    document.getElementById('loading').style.display = 'none';
+    applyFilters();
+  } catch (e) {
+    document.getElementById('loading').innerHTML =
+      `❌ Eroare:<br><code>${escapeHtml(e.message || String(e))}</code>`;
+  }
+}
+
+load();
+</script>
+</body>
+</html>
