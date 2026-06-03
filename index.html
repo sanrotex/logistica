@@ -576,8 +576,8 @@ function toggleLoginPassword() {
   if (!show) document.getElementById('login-password').value = '';
 }
 
-function isAdmin() { return currentUser && currentUser.rol === 'Admin'; }
-function isReclamatii() { return currentUser && currentUser.rol === 'Reclamatii'; }
+function isAdmin() { return currentUser && (currentUser.rol === 'Admin' || currentUser.rol === 'Reclamatii'); }
+function isReclamatii() { return false; }
 
 function doLogin() {
   const uid = parseInt(document.getElementById('login-user').value);
