@@ -581,6 +581,7 @@ function toggleLoginPassword() {
 
 function isAdmin() { return currentUser && (currentUser.rol === 'Admin' || currentUser.rol === 'Reclamatii'); }
 function isReclamatii() { return false; }
+function isBackOffice() { return currentUser && currentUser.rol === 'Reclamatii'; }
 
 function doLogin() {
   const uid = parseInt(document.getElementById('login-user').value);
@@ -626,11 +627,19 @@ function applyRoleUI() {
 function applyModalRoleUI() {
   const recl = isReclamatii();
   const admin = isAdmin();
+  const bo = isBackOffice();
   document.getElementById('section-depozit').style.display = recl ? 'none' : '';
   document.getElementById('section-expeditii').style.display = recl ? 'none' : '';
   document.getElementById('section-observatii').style.display = recl ? 'none' : '';
   document.getElementById('section-reclamatii').style.display = (admin || recl) ? '' : 'none';
   document.getElementById('btn-delete-card').style.display = admin ? '' : 'none';
+  // Reclamații: editabile DOAR pentru Back Office; Admin le vede read-only
+  const edR = document.getElementById('ed-reclamatii');
+  const edRC = document.getElementById('ed-reclamatii-curier');
+  edR.readOnly = !bo;
+  edRC.readOnly = !bo;
+  edR.style.background = bo ? '' : '#f8f9fa';
+  edRC.style.background = bo ? '' : '#f8f9fa';
 }
 
 // ═══ TABS ═══
@@ -828,7 +837,7 @@ async function saveCard() {
       updated_by: currentUser.id,
       updated_at: new Date().toISOString()
     };
-    if (isAdmin()) {
+    if (isBackOffice()) {
       updates.reclamatii = document.getElementById('ed-reclamatii').value.trim();
       updates.reclamatii_curier = document.getElementById('ed-reclamatii-curier').value.trim();
     }
