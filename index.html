@@ -312,7 +312,10 @@ body { background: #f4f6f9; font-family: 'Segoe UI', system-ui, sans-serif; padd
           <!-- Reclamatii -->
           <div class="control-section" id="section-reclamatii">
             <h6 class="text-uppercase text-muted small fw-bold"><i class="bi bi-exclamation-diamond"></i> Reclamații</h6>
-            <textarea class="form-control form-control-sm" id="ed-reclamatii" rows="3" placeholder="Detalii reclamație..."></textarea>
+            <label class="form-label small mb-1">Reclamații client</label>
+            <textarea class="form-control form-control-sm mb-2" id="ed-reclamatii" rows="3" placeholder="Detalii reclamație client..."></textarea>
+            <label class="form-label small mb-1">Reclamații curier</label>
+            <textarea class="form-control form-control-sm" id="ed-reclamatii-curier" rows="3" placeholder="Detalii reclamație curier..."></textarea>
           </div>
         </div>
         <div class="modal-footer d-flex justify-content-between">
@@ -758,6 +761,7 @@ function renderCards() {
         </div>
         ${r.nr_awb ? '<div class="mt-1 small text-muted"><i class="bi bi-truck"></i> AWB: ' + escHtml(r.nr_awb) + '</div>' : ''}
         ${r.reclamatii ? '<div class="mt-1 small text-danger"><i class="bi bi-exclamation-diamond"></i> ' + escHtml(r.reclamatii) + '</div>' : ''}
+        ${r.reclamatii_curier ? '<div class="mt-1 small text-warning"><i class="bi bi-truck-front"></i> Curier: ' + escHtml(r.reclamatii_curier) + '</div>' : ''}
       </div>`;
   }).join('');
 }
@@ -793,6 +797,7 @@ function openEdit(id, source) {
   document.getElementById('ed-notif').checked = row.client_notificat;
   document.getElementById('ed-obs').value = row.observatii || '';
   document.getElementById('ed-reclamatii').value = row.reclamatii || '';
+  document.getElementById('ed-reclamatii-curier').value = row.reclamatii_curier || '';
 
   applyModalRoleUI();
   new bootstrap.Modal(document.getElementById('editModal')).show();
@@ -823,7 +828,10 @@ async function saveCard() {
       updated_by: currentUser.id,
       updated_at: new Date().toISOString()
     };
-    if (isAdmin()) updates.reclamatii = document.getElementById('ed-reclamatii').value.trim();
+    if (isAdmin()) {
+      updates.reclamatii = document.getElementById('ed-reclamatii').value.trim();
+      updates.reclamatii_curier = document.getElementById('ed-reclamatii-curier').value.trim();
+    }
   }
   const { error } = await sb.from('expedieri').update(updates).eq('id', editingId);
   if (error) { alert('Eroare salvare: ' + error.message); return; }
@@ -1045,6 +1053,7 @@ function renderIstoric() {
         ${r.nr_awb ? '<div class="mt-1 small text-muted"><i class="bi bi-truck"></i> AWB: ' + escHtml(r.nr_awb) + '</div>' : ''}
         ${r.observatii ? '<div class="mt-1 small text-muted"><i class="bi bi-chat-text"></i> ' + escHtml(r.observatii) + '</div>' : ''}
         ${r.reclamatii ? '<div class="mt-1 small text-danger"><i class="bi bi-exclamation-diamond"></i> ' + escHtml(r.reclamatii) + '</div>' : ''}
+        ${r.reclamatii_curier ? '<div class="mt-1 small text-warning"><i class="bi bi-truck-front"></i> Curier: ' + escHtml(r.reclamatii_curier) + '</div>' : ''}
       </div>`;
   }).join('');
 }
@@ -1085,13 +1094,14 @@ function exportToExcel(rows, prefix) {
     'Client Notificat': r.client_notificat ? 'DA' : '',
     'Status': getStatus(r),
     'Observații': r.observatii || '',
-    'Reclamații': r.reclamatii || ''
+    'Reclamații client': r.reclamatii || '',
+    'Reclamații curier': r.reclamatii_curier || ''
   }));
   const ws = XLSX.utils.json_to_sheet(exportRows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Expedieri');
   ws['!cols'] = [{ wch: 12 }, { wch: 40 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 15 },
-    { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 15 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 30 }, { wch: 40 }];
+    { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 15 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 30 }, { wch: 40 }, { wch: 40 }];
   XLSX.writeFile(wb, prefix.includes('Istoric_') ? `${prefix}.xlsx` : `${prefix}_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
