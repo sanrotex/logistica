@@ -253,7 +253,13 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const ACTIVE_FAZE_EXCLUDE = new Set(["Castigata", "Pierduta", "Anulata", "Renuntata"]);
+// Faze la care termenul de depunere nu mai inseamna nimic: ori am depus deja, ori
+// procedura s-a incheiat/oprit. Trebuie sa ramana IDENTICA cu `active_faze` din
+// licitatii_tracker.py (desktop), altfel cele doua aplicatii arata cifre diferite.
+// Inainte de 15.09.2026 lipseau Depusa/Atribuita/Suspendata si ieseau 83 "expirate"
+// din 104, desi reale erau 9.
+const ACTIVE_FAZE_EXCLUDE = new Set(["Depusa", "Suspendata", "Atribuita",
+                                     "Castigata", "Pierduta", "Anulata", "Renuntata"]);
 
 let allRows = [];
 let users = {};
