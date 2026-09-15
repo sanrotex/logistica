@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#1a5276">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Licitatii">
 <title>Licitații SANROTEX</title>
 <style>
   *,*::before,*::after { box-sizing: border-box; }
@@ -147,6 +151,15 @@
   .badge.curand  { background: #f1c40f; color: #5a4500; }
   .badge.clarif  { background: #fef9e7; color: #7d6608; }
   .badge.faza    { background: #d6eaf8; color: #1a5276; }
+  .badge.loturi  { background: #ede7f6; color: #4527a0; }
+  .badge.castigat{ background: #d4efdf; color: #196f3d; font-weight: 600; }
+  .badge.pierdut { background: #eaecee; color: #707b7c; }
+  .chk {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 8px; font-size: 13px; color: #5a6c7d;
+    padding: 6px 2px; cursor: pointer; user-select: none;
+  }
+  .chk input { width: 18px; height: 18px; accent-color: #1a5276; }
   .badge.valoare { background: #d5f5e3; color: #196f3d; font-weight: 600; }
 
   /* Detail modal */
@@ -234,6 +247,7 @@
     </select>
   </div>
   <input type="text" class="search" id="f-search" placeholder="🔍 Caută cod, titlu, autoritate...">
+  <label class="chk"><input type="checkbox" id="f-atentie"> Doar ce cere atenție (expirate / azi / curând)</label>
 </div>
 
 <main>
@@ -263,6 +277,7 @@ const ACTIVE_FAZE_EXCLUDE = new Set(["Depusa", "Suspendata", "Atribuita",
 
 let allRows = [];
 let users = {};
+let nrLoturi = {};   // licitatie_id -> numar de loturi
 
 function fmtDate(s) {
   if (!s) return '—';
@@ -310,6 +325,7 @@ function renderCard(r) {
   const respName = users[r.responsabil_id] || '';
   const respCls = userClass(respName);
   const termenCls = status || 'termen';
+  const rez = rezultatDin(r.observatii);
 
   return `
     <div class="card${cls}" data-id="${r.id}">
@@ -323,6 +339,10 @@ function renderCard(r) {
         <span class="badge ${termenCls}">⏰ ${fmtDate(r.data_limita)}</span>
         ${r.data_clarificari ? `<span class="badge clarif">📋 clarif. ${fmtDate(r.data_clarificari)}</span>` : ''}
         <span class="badge faza">${escapeHtml(r.faza || '—')}</span>
+        ${nrLoturi[r.id] ? `<span class="badge loturi">▦ ${nrLoturi[r.id]} ${plural(nrLoturi[r.id], 'lot', 'loturi')}</span>` : ''}
+        ${rez ? (rez.suma
+            ? `<span class="badge castigat">🏆 ${rez.loturi} ${plural(rez.loturi, 'lot', 'loturi')} · ${rez.suma} lei</span>`
+            : `<span class="badge pierdut">✕ niciun lot</span>`) : ''}
         ${r.valoare_est ? `<span class="badge valoare">${fmtValoare(r.valoare_est)}</span>` : ''}
       </div>
     </div>
@@ -338,12 +358,51 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
+// Observatiile contin linkuri catre fisierele de rezultat din SharePoint. Pana acum
+// treceau doar prin escapeHtml, deci pe telefon aparea URL-ul ca text si nu se putea
+// deschide. Escapez intai (XSS), apoi transform http(s) in <a>.
+function escapeSiLinkuri(s) {
+  return escapeHtml(s).replace(/https?:\/\/[^\s<]+/g, u => {
+    const clean = u.replace(/[.,;:)]+$/, '');
+    const coada = u.slice(clean.length);
+    return `<a href="${clean}" target="_blank" rel="noopener">${clean.length > 52 ? clean.slice(0, 52) + '…' : clean}</a>${coada}`;
+  });
+}
+
+// Din observatii extrag rezumatul rezultatului. Textele au fost scrise in sesiuni
+// diferite, cu formulari diferite, deci acopar toate formele intalnite:
+//   "6 loturi CASTIGATE, 194.544 lei"
+//   "4 loc 1 = 344.657 lei"
+//   "5 in acord-cadru = 1.136.280 lei"
+//   "2 loturi CASTIGATE: lot 44 (308.178 lei) si lot 82 (...) = 333.118 lei"
+//   "7 loturi CASTIGATE (5,6,7,20,22,23,46) = 18.297 lei"
+//   "loc 1 pe lot 5 (31.219 lei, ...)"
+// Verificat pe toate cele 27 de licitatii atribuite: 16 cu castig, 11 fara, 0 neacoperite.
+const REZ_EQ = /(\d+)\s*(?:lot\w*\s+)?(?:castigat\w*|loc\s*1|[iî]n\s+acord-cadru)[^=]{0,120}?=\s*([\d.]+)\s*lei/i;
+const REZ_VG = /(\d+)\s*lot\w*\s+castigat\w*\s*,\s*([\d.]+)\s*lei/i;
+const REZ_1  = /loc\s*1\s+pe\s+lot\s+\d+\s*\(\s*([\d.]+)\s*lei/i;
+const REZ_NIL= /niciun\s+lot\s+castigat|respinsi?\s+pe\s+toate|niciun\s+loc\s*1|-\s*\d+\s*(?:necastigat|respins)/i;
+
+function rezultatDin(obs) {
+  if (!obs) return null;
+  const m = obs.match(REZ_EQ) || obs.match(REZ_VG);
+  if (m) return { loturi: +m[1], suma: m[2] };
+  const m1 = obs.match(REZ_1);
+  if (m1) return { loturi: 1, suma: m1[1] };
+  if (REZ_NIL.test(obs)) return { loturi: 0, suma: null };
+  return null;
+}
+
+function plural(n, sg, pl) { return n === 1 ? sg : pl; }
+
 function applyFilters() {
   const faza = document.getElementById('f-faza').value;
   const resp = document.getElementById('f-resp').value;
   const search = document.getElementById('f-search').value.toLowerCase().trim();
+  const doarAtentie = document.getElementById('f-atentie').checked;
 
   const filtered = allRows.filter(r => {
+    if (doarAtentie && !termenStatus(r.data_limita, r.faza)) return false;
     if (faza && r.faza !== faza) return false;
     if (resp) {
       if (resp === '__none__') {
@@ -357,10 +416,17 @@ function applyFilters() {
     return true;
   });
 
+  // Sortare pe urgenta, nu pe data bruta. Inainte, primele carduri erau din aprilie-mai
+  // (terminate), iar ce cere actiune azi era ingropat la mijlocul listei.
+  const RANG = { urgent: 0, azi: 1, curand: 2 };
   filtered.sort((a, b) => {
+    const ra = RANG[termenStatus(a.data_limita, a.faza)] ?? 3;
+    const rb = RANG[termenStatus(b.data_limita, b.faza)] ?? 3;
+    if (ra !== rb) return ra - rb;
     const da = a.data_limita || '9999';
     const db = b.data_limita || '9999';
-    return da.localeCompare(db);
+    // in grupul "restul" (deja depuse/incheiate) vreau cele mai recente primele
+    return ra === 3 ? db.localeCompare(da) : da.localeCompare(db);
   });
 
   document.getElementById('list').innerHTML = filtered.map(renderCard).join('') ||
@@ -392,7 +458,7 @@ function showModal(id) {
     <div class="row"><b>Valoare estimată</b><span>${fmtValoare(r.valoare_est)}</span></div>
     <div class="row"><b>Faza</b><span>${escapeHtml(r.faza || '—')}</span></div>
     <div class="row"><b>Responsabil</b><span>${escapeHtml(respName)}</span></div>
-    ${r.observatii ? `<div class="obs"><b>Observații:</b><br>${escapeHtml(r.observatii)}</div>` : ''}
+    ${r.observatii ? `<div class="obs"><b>Observații:</b><br>${escapeSiLinkuri(r.observatii)}</div>` : ''}
     <div class="actions">
       ${link ? `<a href="${link}" target="_blank" rel="noopener">🔗 Deschide SEAP</a>` : ''}
       <button onclick="window.closeModal()">Închide</button>
@@ -407,19 +473,27 @@ document.getElementById('list').addEventListener('click', e => {
   if (card) showModal(card.dataset.id);
 });
 
-['f-faza', 'f-resp', 'f-search'].forEach(id => {
+['f-faza', 'f-resp', 'f-search', 'f-atentie'].forEach(id => {
   document.getElementById(id).addEventListener('input', applyFilters);
 });
 
 async function load() {
   try {
-    const [licResp, usersResp] = await Promise.all([
+    const [licResp, usersResp, lotResp] = await Promise.all([
       sb.from('licitatii').select('*').order('data_limita', { ascending: true, nullsFirst: false }),
       sb.from('utilizatori').select('id, nume, activ'),
+      sb.from('loturi').select('licitatie_id'),
     ]);
 
     if (licResp.error) throw licResp.error;
     if (usersResp.error) throw usersResp.error;
+    // loturile sunt optionale: daca pica interogarea, aplicatia merge mai departe fara badge
+    if (!lotResp.error) {
+      nrLoturi = {};
+      (lotResp.data || []).forEach(l => {
+        nrLoturi[l.licitatie_id] = (nrLoturi[l.licitatie_id] || 0) + 1;
+      });
+    }
 
     allRows = licResp.data || [];
     users = Object.fromEntries((usersResp.data || []).map(u => [u.id, u.nume]));
@@ -452,6 +526,13 @@ async function load() {
 }
 
 load();
+
+// Service worker: aplicatia se deschide si fara semnal, cu ultima lista descarcata.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
 </script>
 </body>
 </html>
