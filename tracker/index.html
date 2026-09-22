@@ -225,6 +225,48 @@
   .modal .actions a { background: #1a5276; color: white; }
   .modal .actions button { background: #ecf0f1; color: #2c3e50; }
 
+  /* ---- comutator intre "Licitatii" si "Rezultate" ---- */
+  .tabs { display: flex; gap: 6px; margin-top: 8px; }
+  .tabs button {
+    flex: 1; padding: 7px 10px; border: 0; border-radius: 6px;
+    background: rgba(255,255,255,0.18); color: #fff;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .tabs button.on { background: #fff; color: #1a5276; }
+
+  /* ---- rezultate ---- */
+  .kpi { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; padding: 10px 12px; }
+  .kpi div {
+    background: #fff; border-radius: 8px; padding: 9px 10px; text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .kpi b { display: block; font-size: 16px; }
+  .kpi span { font-size: 11px; color: #7f8c8d; }
+  .kpi .win b { color: #196f3d; }
+  .kpi .lost b { color: #9c0006; }
+
+  .rcard {
+    background: #fff; border-radius: 8px; margin: 0 12px 8px; padding: 10px 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-left: 4px solid #bdc3c7;
+  }
+  .rcard.win { border-left-color: #27ae60; }
+  .rcard.lost { border-left-color: #c0392b; }
+  .rcard .t { font-weight: 600; font-size: 14px; }
+  .rcard .s { color: #7f8c8d; font-size: 12px; margin: 2px 0 6px; }
+  .rcard .n { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; }
+  .rcard .n b { font-weight: 600; }
+  .g { color: #196f3d; }
+  .b { color: #9c0006; }
+
+  table.lots { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+  table.lots th { background: #1a5276; color: #fff; padding: 5px 6px; text-align: left; }
+  table.lots td { padding: 5px 6px; border-bottom: 1px solid #eee; vertical-align: top; }
+  table.lots tr.w td { background: #eafaf1; }
+  .tag { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: 600; }
+  .tag.w { background: #d5f5e3; color: #196f3d; }
+  .tag.l { background: #fadbd8; color: #9c0006; }
+  .tag.r { background: #fdebd0; color: #9c640c; }
+
   @media (min-width: 600px) {
     .row-2 { grid-template-columns: 1fr 1fr 2fr; }
     .row-2 input.search { grid-column: span 1; }
@@ -235,9 +277,13 @@
 <header>
   <h1>📋 Licitații SANROTEX</h1>
   <div class="stats" id="stats">se încarcă...</div>
+  <div class="tabs">
+    <button id="tab-lic" class="on">În lucru</button>
+    <button id="tab-rez">Rezultate</button>
+  </div>
 </header>
 
-<div class="filters">
+<div class="filters" id="v-filtre">
   <div class="row-2">
     <select id="f-faza">
       <option value="">Toate fazele</option>
@@ -254,6 +300,20 @@
   <div class="loading" id="loading">⏳ Se încarcă licitațiile...</div>
   <div id="list"></div>
 </main>
+
+<!-- vederea de rezultate; ascunsa pana se apasa pe fila -->
+<div id="v-rez" style="display:none">
+  <div class="kpi" id="rez-kpi"></div>
+  <div class="filters">
+    <input type="text" class="search" id="r-search"
+           placeholder="🔍 Caută procedură, autoritate, lot sau câștigător...">
+    <label class="chk"><input type="checkbox" id="r-doar-cast"> Doar loturile câștigate</label>
+  </div>
+  <main>
+    <div class="loading" id="rez-loading">⏳ Se încarcă rezultatele...</div>
+    <div id="rez-list"></div>
+  </main>
+</div>
 
 <div class="modal-bg" id="modal" onclick="if(event.target.id==='modal') closeModal()">
   <div class="modal" id="modal-body"></div>
@@ -476,6 +536,152 @@ document.getElementById('list').addEventListener('click', e => {
 ['f-faza', 'f-resp', 'f-search', 'f-atentie'].forEach(id => {
   document.getElementById(id).addEventListener('input', applyFilters);
 });
+
+/* =========================== REZULTATE ===========================
+   Citeste rezultatele importate in 'loturi' (castigator, pret_castigator,
+   status) si le arata pe procedura. Strict citire, ca tot restul paginii. */
+let rezProc = [], rezLot = {}, rezIncarcat = false;
+
+function lei0(v) {
+  if (v === null || v === undefined || isNaN(v)) return '—';
+  return Number(v).toLocaleString('ro-RO', { maximumFractionDigits: 0 });
+}
+function unit(v) {
+  if (v === null || v === undefined || isNaN(v)) return '—';
+  return Number(v).toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+}
+function tagStatus(s) {
+  const t = (s || '').toUpperCase();
+  if (t === 'CASTIGAT') return '<span class="tag w">câștigat</span>';
+  if (t === 'RESPINS') return '<span class="tag r">respins</span>';
+  return '<span class="tag l">pierdut</span>';
+}
+
+async function loadRezultate() {
+  if (rezIncarcat) return;
+  try {
+    const [lic, lot] = await Promise.all([
+      sb.from('licitatii').select('id, cod, denumire, autoritate, data_atribuire')
+        .eq('faza', 'Atribuita'),
+      // filtrez dupa STATUS, nu dupa castigator: la 17 loturi (668.516 lei) nu se
+      // stie cine a castigat, iar filtrarea pe castigator le scotea din totaluri
+      sb.from('loturi')
+        .select('licitatie_id, nr_lot, denumire, pret_ofertat, status, castigator, pret_castigator')
+        .in('status', ['CASTIGAT', 'NECASTIGAT', 'RESPINS']),
+    ]);
+    if (lic.error) throw lic.error;
+    if (lot.error) throw lot.error;
+
+    rezLot = {};
+    (lot.data || []).forEach(l => {
+      (rezLot[l.licitatie_id] = rezLot[l.licitatie_id] || []).push(l);
+    });
+    rezProc = (lic.data || []).map(p => {
+      const ls = rezLot[p.id] || [];
+      const of = ls.reduce((s, l) => s + (Number(l.pret_ofertat) || 0), 0);
+      const ca = ls.filter(l => (l.status || '').toUpperCase() === 'CASTIGAT')
+                   .reduce((s, l) => s + (Number(l.pret_ofertat) || 0), 0);
+      return { ...p, loturi: ls, nLot: ls.length,
+               nCast: ls.filter(l => (l.status || '').toUpperCase() === 'CASTIGAT').length,
+               ofertat: of, castigat: ca };
+    }).filter(p => p.nLot > 0)
+      .sort((a, b) => b.ofertat - a.ofertat);
+
+    rezIncarcat = true;
+    document.getElementById('rez-loading').style.display = 'none';
+    renderRez();
+  } catch (e) {
+    document.getElementById('rez-loading').innerHTML =
+      `❌ Eroare:<br><code>${escapeHtml(e.message || String(e))}</code>`;
+  }
+}
+
+function renderRez() {
+  const q = (document.getElementById('r-search').value || '').toLowerCase().trim();
+  const doarCast = document.getElementById('r-doar-cast').checked;
+
+  let lista = rezProc;
+  if (q) {
+    lista = lista.filter(p => {
+      const inProc = [p.cod, p.denumire, p.autoritate].join(' ').toLowerCase().includes(q);
+      const inLot = p.loturi.some(l =>
+        [l.denumire, l.castigator, l.nr_lot].join(' ').toLowerCase().includes(q));
+      return inProc || inLot;
+    });
+  }
+  if (doarCast) lista = lista.filter(p => p.nCast > 0);
+
+  const tOf = lista.reduce((s, p) => s + p.ofertat, 0);
+  const tCa = lista.reduce((s, p) => s + p.castigat, 0);
+  document.getElementById('rez-kpi').innerHTML = `
+    <div><b>${lei0(tOf)}</b><span>ofertat (lei)</span></div>
+    <div class="win"><b>${lei0(tCa)}</b><span>câștigat (lei)</span></div>
+    <div class="lost"><b>${tOf ? Math.round(tCa / tOf * 100) : 0}%</b><span>rată de câștig</span></div>`;
+
+  document.getElementById('rez-list').innerHTML = lista.map(p => `
+    <div class="rcard ${p.nCast ? 'win' : 'lost'}" data-proc="${p.id}">
+      <div class="t">${escapeHtml(p.cod)} — ${escapeHtml(p.autoritate || '')}</div>
+      <div class="s">${escapeHtml(p.denumire || '')}</div>
+      <div class="n">
+        <span><b>${p.nLot}</b> ${plural(p.nLot, 'lot', 'loturi')}</span>
+        <span class="g"><b>${p.nCast}</b> câștigate</span>
+        <span>ofertat <b>${lei0(p.ofertat)}</b></span>
+        <span class="g">câștigat <b>${lei0(p.castigat)}</b></span>
+      </div>
+    </div>`).join('') ||
+    '<div class="loading">Nimic pentru filtrul ăsta.</div>';
+}
+
+function showRezModal(pid) {
+  const p = rezProc.find(x => x.id == pid);
+  if (!p) return;
+  const loturi = [...p.loturi].sort((a, b) => (parseInt(a.nr_lot) || 0) - (parseInt(b.nr_lot) || 0));
+  const randuri = loturi.map(l => {
+    const w = (l.status || '').toUpperCase() === 'CASTIGAT';
+    const noi = /san[rt]otex/i.test(l.castigator || '');
+    return `<tr class="${w ? 'w' : ''}">
+      <td><b>${escapeHtml(String(l.nr_lot))}</b></td>
+      <td>${escapeHtml((l.denumire || '').slice(0, 60))}<br>${tagStatus(l.status)}</td>
+      <td style="text-align:right">${lei0(l.pret_ofertat)}</td>
+      <td>${noi ? '— noi —' : escapeHtml((l.castigator || '—').slice(0, 26))}</td>
+      <td style="text-align:right">${noi ? '' : lei0(l.pret_castigator)}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('modal-body').innerHTML = `
+    <h2>${escapeHtml(p.cod)}</h2>
+    <div style="color:#5a6c7d;font-size:13px;margin-bottom:6px;">${escapeHtml(p.autoritate || '')}</div>
+    <div class="row"><b>Loturi</b><span>${p.nLot}, din care <b class="g">${p.nCast} câștigate</b></span></div>
+    <div class="row"><b>Ofertat</b><span>${lei0(p.ofertat)} lei</span></div>
+    <div class="row"><b>Câștigat</b><span class="g"><b>${lei0(p.castigat)} lei</b></span></div>
+    <div class="row"><b>Data atribuirii</b><span>${fmtDate(p.data_atribuire)}</span></div>
+    <table class="lots">
+      <tr><th>Lot</th><th>Denumire</th><th style="text-align:right">Noi</th>
+          <th>Câștigător</th><th style="text-align:right">Prețul lui</th></tr>
+      ${randuri}
+    </table>
+    <div style="font-size:11px;color:#7f8c8d;margin-top:8px">Valori fără TVA.</div>
+    <div class="actions"><button onclick="window.closeModal()">Închide</button></div>`;
+  document.getElementById('modal').classList.add('open');
+}
+
+document.getElementById('rez-list').addEventListener('click', e => {
+  const c = e.target.closest('.rcard');
+  if (c) showRezModal(c.dataset.proc);
+});
+['r-search', 'r-doar-cast'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => { if (rezIncarcat) renderRez(); });
+});
+
+function comuta(peRezultate) {
+  document.getElementById('tab-lic').classList.toggle('on', !peRezultate);
+  document.getElementById('tab-rez').classList.toggle('on', peRezultate);
+  document.getElementById('v-filtre').style.display = peRezultate ? 'none' : '';
+  document.querySelector('main').style.display = peRezultate ? 'none' : '';
+  document.getElementById('v-rez').style.display = peRezultate ? '' : 'none';
+  if (peRezultate) loadRezultate();
+}
+document.getElementById('tab-lic').addEventListener('click', () => comuta(false));
+document.getElementById('tab-rez').addEventListener('click', () => comuta(true));
 
 async function load() {
   try {
